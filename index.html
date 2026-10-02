@@ -28,6 +28,7 @@
   .item .n{font-weight:600;word-break:break-all}
   .item .m{font-size:12px;color:var(--mute)}
   .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:6px;background:var(--line);margin-right:4px}
+  .up{margin-left:2px}
   .open{flex:none;color:var(--brand);text-decoration:none;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:5px 10px}
   .empty{text-align:center;color:var(--mute);padding:40px 0}
   #bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:none}
@@ -73,9 +74,11 @@
 <script>
 const CATS = {market:"美股大盤", daily:"每日跨股總表", stock:"個股研究", card:"行動卡", verify:"核實報告"};
 const link = id => "https://drive.google.com/file/d/" + id + "/view";
-const items = window.REPORTS.map(([cat,id,name]) => {
+const hkFmt = new Intl.DateTimeFormat("zh-HK", {timeZone:"Asia/Hong_Kong", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", hour12:false});
+const hkTime = iso => { const o = Object.fromEntries(hkFmt.formatToParts(new Date(iso)).map(x => [x.type, x.value])); return o.month + "-" + o.day + " " + (o.hour==="24"?"00":o.hour) + ":" + o.minute; };
+const items = window.REPORTS.map(([cat,id,name,up]) => {
   const p = name.split("_");
-  return {cat, id, name, date:p[0], ticker:/^[A-Z]{1,5}$/.test(p[1]) ? p[1] : "", url:link(id)};
+  return {cat, id, name, up, date:p[0], ticker:/^[A-Z]{1,5}$/.test(p[1]) ? p[1] : "", url:link(id)};
 }).sort((a,b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
 
 const $ = s => document.querySelector(s);
@@ -117,7 +120,7 @@ function render(){
       `<div class="item${state.sel.has(r.id)?" sel":""}" data-id="${r.id}">
         <input type="checkbox" ${state.sel.has(r.id)?"checked":""} aria-label="選取 ${esc(r.name)}">
         <div class="t"><div class="n">${esc(r.name.slice(11))}</div>
-          <div class="m"><span class="tag">${CATS[r.cat]}</span>${r.ticker?`<span class="tag">${r.ticker}</span>`:""}</div></div>
+          <div class="m"><span class="tag">${CATS[r.cat]}</span>${r.ticker?`<span class="tag">${r.ticker}</span>`:""}<span class="up">上傳 ${hkTime(r.up)}（HKT）</span></div></div>
         <a class="open" href="${r.url}" target="_blank" rel="noopener">打開</a>
       </div>`).join("") + `</div>`).join("") : `<div class="empty">搵唔到相關報告</div>`;
   updateBar();
