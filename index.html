@@ -37,6 +37,8 @@
   #bar input{width:150px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
   #bar button{border:0;border-radius:10px;padding:10px 14px;font:inherit;font-weight:600;cursor:pointer}
   #wa{background:var(--wa);color:#073b1a}
+  #pdf{background:var(--brand);color:#fff}
+  #pdf:disabled{opacity:.5}
   #cp,#clr{background:var(--line);color:var(--ink)}
   #toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:#111;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;display:none}
 </style>
@@ -62,7 +64,8 @@
   <input id="phone" type="tel" inputmode="tel" placeholder="電話（選填，如 85291234567）">
   <button id="clr">清除</button>
   <button id="cp">複製訊息</button>
-  <button id="wa">WhatsApp 分享</button>
+  <button id="pdf" style="display:none">分享 PDF 檔案</button>
+  <button id="wa">WhatsApp 連結</button>
 </div></div>
 <div id="toast"></div>
 
@@ -147,6 +150,7 @@ function updateBar(){
   const n = state.sel.size;
   $("#bar").classList.toggle("show", n>0);
   $("#cnt").textContent = "已選 " + n + " 份";
+  if(n) refreshPdfBtn();
 }
 function toast(t){ const el=$("#toast"); el.textContent=t; el.style.display="block"; setTimeout(()=>el.style.display="none",1800); }
 
@@ -157,6 +161,39 @@ $("#wa").onclick = () => {
 };
 $("#cp").onclick = async () => {
   try { await navigator.clipboard.writeText(message()); toast("已複製"); } catch(e){ toast("複製失敗"); }
+};
+
+// ---- 直接分享 PDF 檔案（手機瀏覽器 Web Share API）----
+// 揀選時預先下載，確保撳掣時可即時 share（iOS 要求喺撳掣當下呼叫）
+const files = new Map();
+function canShareFiles(){
+  try { return !!navigator.canShare && navigator.canShare({files:[new File(["x"],"x.pdf",{type:"application/pdf"})]}); } catch(e){ return false; }
+}
+const fileShare = canShareFiles();
+function prefetch(){
+  if(!fileShare) return;
+  selected().forEach(r => {
+    if(files.has(r.id)) return;
+    files.set(r.id, fetch("/pdf/" + r.id).then(x => { if(!x.ok) throw 0; return x.blob(); })
+      .then(b => new File([b], r.name + ".pdf", {type:"application/pdf"}))
+      .catch(() => { files.delete(r.id); return null; }));
+  });
+}
+const readyFiles = () => selected().map(r => files.get(r.id)).filter(Boolean);
+async function refreshPdfBtn(){
+  const b = $("#pdf"); if(!fileShare){ b.style.display="none"; return; }
+  b.style.display = ""; prefetch();
+  const n = state.sel.size, done = await Promise.all(selected().map(r => files.get(r.id)));
+  const loaded = done.filter(Boolean).length;
+  b.disabled = loaded < n; b.textContent = loaded < n ? "準備 PDF… " + loaded + "/" + n : "分享 PDF 檔案";
+  if(loaded < n && state.sel.size === n) setTimeout(refreshPdfBtn, 500);
+}
+$("#pdf").onclick = async () => {
+  const list = await Promise.all(selected().map(r => files.get(r.id)));
+  const fs_ = list.filter(Boolean);
+  if(!fs_.length) return toast("PDF 未準備好");
+  try { await navigator.share({files: fs_, title: "JLaw 報告"}); }
+  catch(e){ if(e.name !== "AbortError") toast("分享失敗，請改用連結"); }
 };
 render();
 </script>
