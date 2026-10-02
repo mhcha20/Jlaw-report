@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JLaw 報告中心</title>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--ink:#1a1d23;--mute:#6b7280;--line:#e3e6eb;--brand:#0f766e;--wa:#25d366;--sel:#e6f4f1}
+  @media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#181b21;--ink:#e8eaee;--mute:#99a1ad;--line:#2a2f38;--brand:#2dd4bf;--sel:#12302c}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,"PingFang HK","Noto Sans TC",sans-serif;padding-bottom:90px}
+  header{padding:20px 16px 8px;max-width:900px;margin:0 auto}
+  h1{margin:0;font-size:22px}
+  header p{margin:4px 0 0;color:var(--mute);font-size:13px}
+  header a{color:var(--brand)}
+  .wrap{max-width:900px;margin:0 auto;padding:0 16px}
+  .tabs,.chips{display:flex;gap:8px;overflow-x:auto;padding:8px 0;scrollbar-width:none}
+  .tabs button,.chips button{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}
+  .tabs button.on,.chips button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .tools{display:flex;gap:8px;margin:4px 0 8px}
+  .tools input[type=search]{flex:1;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit}
+  .tools button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:0 12px;font:inherit;cursor:pointer;white-space:nowrap}
+  .group h2{font-size:13px;color:var(--mute);margin:16px 0 6px;font-weight:600}
+  .item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:6px}
+  .item.sel{background:var(--sel);border-color:var(--brand)}
+  .item input{width:20px;height:20px;flex:none;accent-color:var(--brand)}
+  .item .t{flex:1;min-width:0;cursor:pointer}
+  .item .n{font-weight:600;word-break:break-all}
+  .item .m{font-size:12px;color:var(--mute)}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:6px;background:var(--line);margin-right:4px}
+  .open{flex:none;color:var(--brand);text-decoration:none;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:5px 10px}
+  .empty{text-align:center;color:var(--mute);padding:40px 0}
+  #bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:none}
+  #bar.show{display:block}
+  #bar .in{max-width:900px;margin:0 auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  #bar .cnt{flex:1;min-width:90px;font-weight:600}
+  #bar input{width:150px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+  #bar button{border:0;border-radius:10px;padding:10px 14px;font:inherit;font-weight:600;cursor:pointer}
+  #wa{background:var(--wa);color:#073b1a}
+  #cp,#clr{background:var(--line);color:var(--ink)}
+  #toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:#111;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>JLaw 報告中心</h1>
+  <p>共 <span id="total"></span> 份報告 · 撳標題打開 PDF · 剔選後可直接 WhatsApp 分享 ·
+    <a id="f1" target="_blank" rel="noopener">Drive 資料夾 1</a> / <a id="f2" target="_blank" rel="noopener">2</a></p>
+</header>
+<div class="wrap">
+  <div class="tabs" id="tabs"></div>
+  <div class="chips" id="chips"></div>
+  <div class="tools">
+    <input type="search" id="q" placeholder="搜尋（股票代號、日期、報告類型…）">
+    <button id="selAll">全選當前</button>
+  </div>
+  <div id="list"></div>
+</div>
+
+<div id="bar"><div class="in">
+  <span class="cnt" id="cnt"></span>
+  <input id="phone" type="tel" inputmode="tel" placeholder="電話（選填，如 85291234567）">
+  <button id="clr">清除</button>
+  <button id="cp">複製訊息</button>
+  <button id="wa">WhatsApp 分享</button>
+</div></div>
+<div id="toast"></div>
+
+<script src="data.js"></script>
+<script>
+const CATS = {market:"美股大盤", daily:"每日跨股總表", stock:"個股研究", card:"行動卡", verify:"核實報告"};
+const link = id => "https://drive.google.com/file/d/" + id + "/view";
+const items = window.REPORTS.map(([cat,id,name]) => {
+  const p = name.split("_");
+  return {cat, id, name, date:p[0], ticker:/^[A-Z]{1,5}$/.test(p[1]) ? p[1] : "", url:link(id)};
+}).sort((a,b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
+
+const $ = s => document.querySelector(s);
+const state = {cat:"all", ticker:"all", q:"", sel:new Set()};
+try { const s = JSON.parse(localStorage.getItem("jlaw-sel")||"[]"); s.forEach(i => state.sel.add(i)); $("#phone").value = localStorage.getItem("jlaw-phone")||""; } catch(e){}
+
+$("#total").textContent = items.length;
+$("#f1").href = window.FOLDERS[0]; $("#f2").href = window.FOLDERS[1];
+
+function visible(){
+  const q = state.q.trim().toLowerCase();
+  return items.filter(r =>
+    (state.cat==="all" || r.cat===state.cat) &&
+    (state.ticker==="all" || r.ticker===state.ticker) &&
+    (!q || (r.name+" "+CATS[r.cat]).toLowerCase().includes(q)));
+}
+function btns(el, entries, key){
+  el.innerHTML = "";
+  entries.forEach(([v,label]) => {
+    const b = document.createElement("button");
+    b.textContent = label; if(state[key]===v) b.className = "on";
+    b.onclick = () => { state[key]=v; render(); };
+    el.appendChild(b);
+  });
+}
+function esc(s){ return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function render(){
+  btns($("#tabs"), [["all","全部"], ...Object.entries(CATS)], "cat");
+  const tickers = [...new Set(items.filter(r => state.cat==="all"||r.cat===state.cat).map(r=>r.ticker).filter(Boolean))].sort();
+  if(state.ticker!=="all" && !tickers.includes(state.ticker)) state.ticker="all";
+  btns($("#chips"), [["all","所有股票"], ...tickers.map(t=>[t,t])], "ticker");
+  $("#chips").style.display = tickers.length ? "" : "none";
+
+  const rows = visible(), byDate = {};
+  rows.forEach(r => (byDate[r.date] ||= []).push(r));
+  $("#list").innerHTML = rows.length ? Object.keys(byDate).sort().reverse().map(d =>
+    `<div class="group"><h2>${d}</h2>` + byDate[d].map(r =>
+      `<div class="item${state.sel.has(r.id)?" sel":""}" data-id="${r.id}">
+        <input type="checkbox" ${state.sel.has(r.id)?"checked":""} aria-label="選取 ${esc(r.name)}">
+        <div class="t"><div class="n">${esc(r.name.slice(11))}</div>
+          <div class="m"><span class="tag">${CATS[r.cat]}</span>${r.ticker?`<span class="tag">${r.ticker}</span>`:""}</div></div>
+        <a class="open" href="${r.url}" target="_blank" rel="noopener">打開</a>
+      </div>`).join("") + `</div>`).join("") : `<div class="empty">搵唔到相關報告</div>`;
+  updateBar();
+}
+
+$("#list").addEventListener("click", e => {
+  if(e.target.closest("a")) return;
+  const el = e.target.closest(".item"); if(!el) return;
+  toggle(el.dataset.id);
+});
+function toggle(id){ state.sel.has(id) ? state.sel.delete(id) : state.sel.add(id); persist(); render(); }
+function persist(){ try{ localStorage.setItem("jlaw-sel", JSON.stringify([...state.sel])); }catch(e){} }
+
+$("#q").oninput = e => { state.q = e.target.value; render(); };
+$("#selAll").onclick = () => {
+  const rows = visible(), all = rows.every(r => state.sel.has(r.id));
+  rows.forEach(r => all ? state.sel.delete(r.id) : state.sel.add(r.id));
+  persist(); render();
+};
+$("#clr").onclick = () => { state.sel.clear(); persist(); render(); };
+$("#phone").onchange = e => { try{ localStorage.setItem("jlaw-phone", e.target.value); }catch(_){} };
+
+function selected(){ return items.filter(r => state.sel.has(r.id)); }
+function message(){
+  const rows = selected();
+  return "📊 JLaw 報告（" + rows.length + " 份）\n\n" +
+    rows.map((r,i) => (i+1) + ". " + r.name + "\n" + r.url).join("\n\n");
+}
+function updateBar(){
+  const n = state.sel.size;
+  $("#bar").classList.toggle("show", n>0);
+  $("#cnt").textContent = "已選 " + n + " 份";
+}
+function toast(t){ const el=$("#toast"); el.textContent=t; el.style.display="block"; setTimeout(()=>el.style.display="none",1800); }
+
+$("#wa").onclick = () => {
+  const phone = $("#phone").value.replace(/\D/g,"");
+  const base = phone ? "https://wa.me/" + phone : "https://wa.me/";
+  window.open(base + "?text=" + encodeURIComponent(message()), "_blank", "noopener");
+};
+$("#cp").onclick = async () => {
+  try { await navigator.clipboard.writeText(message()); toast("已複製"); } catch(e){ toast("複製失敗"); }
+};
+render();
+</script>
+</body>
+</html>
