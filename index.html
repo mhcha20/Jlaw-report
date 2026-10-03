@@ -43,6 +43,13 @@
   #pdf{background:var(--brand);color:#fff}
   #pdf:disabled{opacity:.5}
   #cp,#clr{background:var(--line);color:var(--ink)}
+  #adm{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:3px 10px;font:inherit;cursor:pointer}
+  #adm.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  #showHid{display:none;margin-left:6px;font-size:13px}
+  #hide,#del{display:none}
+  #hide{background:var(--line);color:var(--ink)}
+  #del{background:#dc2626;color:#fff}
+  .item.hid{opacity:.55}
   #toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:#111;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;display:none}
 </style>
 </head>
@@ -51,7 +58,8 @@
   <h1>JLaw 報告中心</h1>
   <p>共 <span id="total"></span> 份報告 · 撳標題打開 PDF · 剔選後可直接 WhatsApp 分享 ·
     <a id="f1" target="_blank" rel="noopener">Drive 資料夾 1</a> / <a id="f2" target="_blank" rel="noopener">2</a>
-    · <button id="sync" type="button">🔄 同步 Drive</button> <span id="syncAt"></span></p>
+    · <button id="sync" type="button">🔄 同步 Drive</button> <span id="syncAt"></span>
+    · <button id="adm" type="button">🔒 管理</button><label id="showHid"><input type="checkbox" id="showHidCb"> 顯示已隱藏</label></p>
 </header>
 <div class="wrap">
   <div class="tabs" id="tabs"></div>
@@ -67,6 +75,8 @@
   <span class="cnt" id="cnt"></span>
   <input id="phone" type="tel" inputmode="tel" placeholder="電話（選填，如 85291234567）">
   <button id="clr">清除</button>
+  <button id="hide">隱藏</button>
+  <button id="del">🗑 Drive 刪除</button>
   <button id="cp">複製訊息</button>
   <button id="pdf" style="display:none">分享 PDF 檔案</button>
   <button id="wa">WhatsApp 連結</button>
@@ -86,15 +96,18 @@ const toItems = rows => rows.map(([cat,id,name,up]) => {
 let items = toItems(window.REPORTS);
 
 const $ = s => document.querySelector(s);
-const state = {cat:"all", ticker:"all", q:"", sel:new Set()};
+const state = {cat:"all", ticker:"all", q:"", sel:new Set(), hidden:new Set(), deleted:new Set(), showHidden:false, pw:"", canDelete:false};
 try { const s = JSON.parse(localStorage.getItem("jlaw-sel")||"[]"); s.forEach(i => state.sel.add(i)); $("#phone").value = localStorage.getItem("jlaw-phone")||""; } catch(e){}
 
-$("#total").textContent = items.length;
+const shown = () => items.filter(r => !state.deleted.has(r.id) && !state.hidden.has(r.id));
+const updTotal = () => { $("#total").textContent = shown().length; };
+updTotal();
 $("#f1").href = window.FOLDERS[0]; $("#f2").href = window.FOLDERS[1];
 
 function visible(){
   const q = state.q.trim().toLowerCase();
   return items.filter(r =>
+    !state.deleted.has(r.id) && (state.showHidden || !state.hidden.has(r.id)) &&
     (state.cat==="all" || r.cat===state.cat) &&
     (state.ticker==="all" || r.ticker===state.ticker) &&
     (!q || (r.name+" "+CATS[r.cat]).toLowerCase().includes(q)));
@@ -112,7 +125,7 @@ function esc(s){ return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"
 
 function render(){
   btns($("#tabs"), [["all","全部"], ...Object.entries(CATS)], "cat");
-  const tickers = [...new Set(items.filter(r => state.cat==="all"||r.cat===state.cat).map(r=>r.ticker).filter(Boolean))].sort();
+  const tickers = [...new Set(items.filter(r => !state.deleted.has(r.id) && (state.showHidden || !state.hidden.has(r.id))).filter(r => state.cat==="all"||r.cat===state.cat).map(r=>r.ticker).filter(Boolean))].sort();
   if(state.ticker!=="all" && !tickers.includes(state.ticker)) state.ticker="all";
   btns($("#chips"), [["all","所有股票"], ...tickers.map(t=>[t,t])], "ticker");
   $("#chips").style.display = tickers.length ? "" : "none";
@@ -121,10 +134,10 @@ function render(){
   rows.forEach(r => (byDate[r.date] ||= []).push(r));
   $("#list").innerHTML = rows.length ? Object.keys(byDate).sort().reverse().map(d =>
     `<div class="group"><h2>${d}</h2>` + byDate[d].map(r =>
-      `<div class="item${state.sel.has(r.id)?" sel":""}" data-id="${r.id}">
+      `<div class="item${state.sel.has(r.id)?" sel":""}${state.hidden.has(r.id)?" hid":""}" data-id="${r.id}">
         <input type="checkbox" ${state.sel.has(r.id)?"checked":""} aria-label="選取 ${esc(r.name)}">
         <div class="t"><div class="n">${esc(r.name.slice(11))}</div>
-          <div class="m"><span class="tag">${CATS[r.cat]}</span>${r.ticker?`<span class="tag">${r.ticker}</span>`:""}<span class="up">上傳 ${hkTime(r.up)}（HKT）</span></div></div>
+          <div class="m"><span class="tag">${CATS[r.cat]}</span>${state.hidden.has(r.id)?`<span class="tag">已隱藏</span>`:""}${r.ticker?`<span class="tag">${r.ticker}</span>`:""}<span class="up">上傳 ${hkTime(r.up)}（HKT）</span></div></div>
         <a class="open" href="${r.url}" target="_blank" rel="noopener">打開</a>
       </div>`).join("") + `</div>`).join("") : `<div class="empty">搵唔到相關報告</div>`;
   updateBar();
@@ -147,7 +160,7 @@ $("#selAll").onclick = () => {
 $("#clr").onclick = () => { state.sel.clear(); persist(); render(); };
 $("#phone").onchange = e => { try{ localStorage.setItem("jlaw-phone", e.target.value); }catch(_){} };
 
-function selected(){ return items.filter(r => state.sel.has(r.id)); }
+function selected(){ return items.filter(r => state.sel.has(r.id) && !state.deleted.has(r.id)); }
 // 分享內容：按「日期 + 類型」分組，列出股票代號，例如「2026-10-02 行動卡：DE、FPS、PLTR」
 const LABEL = {market:"美股大盤分析", daily:"每日跨股總表", stock:"個股研究報告", card:"行動卡", verify:"核實報告", other:"報告"};
 function describe(rows){
@@ -170,9 +183,12 @@ function updateBar(){
   const n = state.sel.size;
   $("#bar").classList.toggle("show", n>0);
   $("#cnt").textContent = "已選 " + n + " 份";
+  const adm = !!state.pw;
+  $("#hide").style.display = adm ? "inline-block" : "none"; $("#del").style.display = adm && state.canDelete ? "inline-block" : "none";
+  $("#hide").textContent = n && selected().every(r => state.hidden.has(r.id)) ? "還原" : "隱藏";
   if(n) refreshPdfBtn();
 }
-function toast(t){ const el=$("#toast"); el.textContent=t; el.style.display="block"; setTimeout(()=>el.style.display="none",1800); }
+function toast(t){ const el=$("#toast"); el.textContent=t; el.style.display="block"; setTimeout(()=>el.style.display="none", Math.max(1800, t.length*120)); }
 
 $("#wa").onclick = () => {
   const phone = $("#phone").value.replace(/\D/g,"");
@@ -225,9 +241,9 @@ async function syncDrive(manual){
     if(!r.ok) throw new Error(r.status === 503 ? "未設定 DRIVE_API_KEY" : (j.error || r.status));
     const before = new Set(items.map(x => x.id));
     items = toItems(j.rows);
-    const added = items.filter(x => !before.has(x.id)).length, removed = [...before].filter(id => !items.some(x => x.id === id)).length;
+    const added = items.filter(x => !before.has(x.id) && !state.deleted.has(x.id)).length, removed = [...before].filter(id => !items.some(x => x.id === id)).length;
     [...state.sel].forEach(id => { if(!items.some(x => x.id === id)) state.sel.delete(id); });
-    $("#total").textContent = items.length; persist(); render();
+    updTotal(); persist(); render();
     $("#syncAt").textContent = "最後同步 " + hkTime(new Date().toISOString()).slice(6) + " HKT";
     if(manual) toast(added || removed ? "新增 " + added + " 份" + (removed ? "，移除 " + removed + " 份" : "") : "已係最新");
   } catch(e){ if(manual) toast("同步失敗：" + e.message); }
@@ -235,6 +251,61 @@ async function syncDrive(manual){
 }
 $("#sync").onclick = () => syncDrive(true);
 syncDrive(false);
+// ---- 管理：隱藏 / 刪除（需密碼）----
+async function api(path, payload){
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json", "x-admin-password":state.pw}, body:JSON.stringify(payload||{})});
+  const j = await r.json().catch(() => ({}));
+  if(r.status === 401){ lock(); throw new Error("密碼錯誤，已退出管理"); }
+  return {ok:r.ok, status:r.status, j};
+}
+function applyVis(j){ state.hidden = new Set(j.hidden||[]); state.deleted = new Set(j.deleted||[]); [...state.sel].forEach(i => { if(state.deleted.has(i)) state.sel.delete(i); }); updTotal(); persist(); render(); }
+function lock(){ state.pw = ""; try{ sessionStorage.removeItem("jlaw-pw"); }catch(e){} state.showHidden = false; $("#showHidCb").checked = false; adminUi(); render(); }
+function adminUi(){
+  const on = !!state.pw;
+  $("#adm").textContent = on ? "🔓 管理中（退出）" : "🔒 管理"; $("#adm").classList.toggle("on", on);
+  $("#showHid").style.display = on ? "inline" : "none";
+}
+$("#adm").onclick = async () => {
+  if(state.pw) return lock();
+  const pw = prompt("請輸入管理密碼"); if(!pw) return;
+  state.pw = pw;
+  try {
+    const r = await api("/api/auth");
+    if(!r.ok) throw new Error(r.status === 503 ? "未設定 ADMIN_PASSWORD" : (r.j.error || "密碼錯誤"));
+    try{ sessionStorage.setItem("jlaw-pw", pw); }catch(e){}
+    adminUi(); render(); toast("已進入管理模式");
+  } catch(e){ state.pw = ""; adminUi(); toast(e.message); }
+};
+$("#showHidCb").onchange = e => { state.showHidden = e.target.checked; render(); };
+$("#hide").onclick = async () => {
+  const rows = selected(), restore = rows.every(r => state.hidden.has(r.id));
+  try {
+    const r = await api("/api/hide", {ids:rows.map(x => x.id), hidden:!restore});
+    if(!r.ok) throw new Error(r.j.error || r.status);
+    if(!restore) state.sel.clear();
+    applyVis(r.j); toast(restore ? "已還原 " + rows.length + " 份" : "已隱藏 " + rows.length + " 份");
+  } catch(e){ toast("失敗：" + e.message); }
+};
+$("#del").onclick = async () => {
+  const rows = selected(); if(!rows.length) return;
+  const list = rows.slice(0,6).map(r => "• " + r.name).join("\n") + (rows.length > 6 ? "\n…等共 " + rows.length + " 份" : "");
+  if(!confirm("確定將以下 " + rows.length + " 份報告移到 Google Drive 垃圾桶？\n\n" + list + "\n\n其他人嘅連結會即時失效，30 日內可喺 Drive 垃圾桶還原。")) return;
+  try {
+    const r = await api("/api/delete", {ids:rows.map(x => x.id)});
+    if(r.status === 503) throw new Error(r.j.failed && r.j.failed[0] ? r.j.failed[0].error : (r.j.error || "未設定"));
+    const done = (r.j.done||[]).length, failed = r.j.failed||[];
+    if(r.j.hidden) applyVis(r.j);
+    toast(failed.length ? "已刪除 " + done + " 份，" + failed.length + " 份失敗：" + failed[0].error : "已刪除 " + done + " 份");
+  } catch(e){ toast("刪除失敗：" + e.message); }
+};
+(async () => {
+  try {
+    const j = await (await fetch("/api/hidden")).json();
+    state.canDelete = !!j.canDelete; applyVis(j);
+    const pw = sessionStorage.getItem("jlaw-pw");
+    if(pw){ state.pw = pw; const r = await api("/api/auth"); if(r.ok){ adminUi(); render(); } else lock(); }
+  } catch(e){ state.pw = ""; }
+})();
 </script>
 </body>
 </html>
