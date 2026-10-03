@@ -13,6 +13,8 @@
   h1{margin:0;font-size:22px}
   header p{margin:4px 0 0;color:var(--mute);font-size:13px}
   header a{color:var(--brand)}
+  #sync{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:3px 10px;font:inherit;cursor:pointer}
+  #sync:disabled{opacity:.5}
   .wrap{max-width:900px;margin:0 auto;padding:0 16px}
   .tabs,.chips{display:flex;gap:8px;overflow-x:auto;padding:8px 0;scrollbar-width:none}
   .tabs button,.chips button{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}
@@ -48,7 +50,8 @@
 <header>
   <h1>JLaw 報告中心</h1>
   <p>共 <span id="total"></span> 份報告 · 撳標題打開 PDF · 剔選後可直接 WhatsApp 分享 ·
-    <a id="f1" target="_blank" rel="noopener">Drive 資料夾 1</a> / <a id="f2" target="_blank" rel="noopener">2</a></p>
+    <a id="f1" target="_blank" rel="noopener">Drive 資料夾 1</a> / <a id="f2" target="_blank" rel="noopener">2</a>
+    · <button id="sync" type="button">🔄 同步 Drive</button> <span id="syncAt"></span></p>
 </header>
 <div class="wrap">
   <div class="tabs" id="tabs"></div>
@@ -72,14 +75,15 @@
 
 <script src="data.js"></script>
 <script>
-const CATS = {market:"美股大盤", daily:"每日跨股總表", stock:"個股研究", card:"行動卡", verify:"核實報告"};
+const CATS = {market:"美股大盤", daily:"每日跨股總表", stock:"個股研究", card:"行動卡", verify:"核實報告", other:"其他"};
 const link = id => "https://drive.google.com/file/d/" + id + "/view";
 const hkFmt = new Intl.DateTimeFormat("zh-HK", {timeZone:"Asia/Hong_Kong", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", hour12:false});
 const hkTime = iso => { const o = Object.fromEntries(hkFmt.formatToParts(new Date(iso)).map(x => [x.type, x.value])); return o.month + "-" + o.day + " " + (o.hour==="24"?"00":o.hour) + ":" + o.minute; };
-const items = window.REPORTS.map(([cat,id,name,up]) => {
+const toItems = rows => rows.map(([cat,id,name,up]) => {
   const p = name.split("_");
   return {cat, id, name, up, date:p[0], ticker:/^[A-Z]{1,5}$/.test(p[1]) ? p[1] : "", url:link(id)};
 }).sort((a,b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
+let items = toItems(window.REPORTS);
 
 const $ = s => document.querySelector(s);
 const state = {cat:"all", ticker:"all", q:"", sel:new Set()};
@@ -199,6 +203,24 @@ $("#pdf").onclick = async () => {
   catch(e){ if(e.name !== "AbortError") toast("分享失敗，請改用連結"); }
 };
 render();
+// ---- 同步 Drive ----
+async function syncDrive(manual){
+  const b = $("#sync"); b.disabled = true; b.textContent = "同步中…";
+  try {
+    const r = await fetch("/api/sync"); const j = await r.json();
+    if(!r.ok) throw new Error(r.status === 503 ? "未設定 DRIVE_API_KEY" : (j.error || r.status));
+    const before = new Set(items.map(x => x.id));
+    items = toItems(j.rows);
+    const added = items.filter(x => !before.has(x.id)).length, removed = [...before].filter(id => !items.some(x => x.id === id)).length;
+    [...state.sel].forEach(id => { if(!items.some(x => x.id === id)) state.sel.delete(id); });
+    $("#total").textContent = items.length; persist(); render();
+    $("#syncAt").textContent = "最後同步 " + hkTime(new Date().toISOString()).slice(6) + " HKT";
+    if(manual) toast(added || removed ? "新增 " + added + " 份" + (removed ? "，移除 " + removed + " 份" : "") : "已係最新");
+  } catch(e){ if(manual) toast("同步失敗：" + e.message); }
+  finally { b.disabled = false; b.textContent = "🔄 同步 Drive"; }
+}
+$("#sync").onclick = () => syncDrive(true);
+syncDrive(false);
 </script>
 </body>
 </html>
