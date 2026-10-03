@@ -148,10 +148,23 @@ $("#clr").onclick = () => { state.sel.clear(); persist(); render(); };
 $("#phone").onchange = e => { try{ localStorage.setItem("jlaw-phone", e.target.value); }catch(_){} };
 
 function selected(){ return items.filter(r => state.sel.has(r.id)); }
+// 分享內容：按「日期 + 類型」分組，列出股票代號，例如「2026-10-02 行動卡：DE、FPS、PLTR」
+const LABEL = {market:"美股大盤分析", daily:"每日跨股總表", stock:"個股研究報告", card:"行動卡", verify:"核實報告", other:"報告"};
+function describe(rows){
+  const groups = new Map();
+  rows.forEach(r => {
+    const k = r.date + "|" + r.cat;
+    if(!groups.has(k)) groups.set(k, {date:r.date, cat:r.cat, tickers:[]});
+    if(r.ticker) groups.get(k).tickers.push(r.ticker);
+  });
+  return [...groups.values()]
+    .sort((a,b) => b.date.localeCompare(a.date) || Object.keys(LABEL).indexOf(a.cat) - Object.keys(LABEL).indexOf(b.cat))
+    .map(g => g.date + " " + LABEL[g.cat] + (g.tickers.length ? "：" + [...new Set(g.tickers)].sort().join("、") : ""))
+    .join("\n");
+}
 function message(){
   const rows = selected();
-  return "📊 JLaw 報告（" + rows.length + " 份）\n\n" +
-    rows.map((r,i) => (i+1) + ". " + r.name + "\n" + r.url).join("\n\n");
+  return describe(rows) + "\n\n" + rows.map(r => r.name + "\n" + r.url).join("\n\n");
 }
 function updateBar(){
   const n = state.sel.size;
@@ -199,7 +212,8 @@ $("#pdf").onclick = async () => {
   const list = await Promise.all(selected().map(r => files.get(r.id)));
   const fs_ = list.filter(Boolean);
   if(!fs_.length) return toast("PDF 未準備好");
-  try { await navigator.share({files: fs_, title: "JLaw 報告"}); }
+  const d = describe(selected()), ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  try { await navigator.share(ios ? {files: fs_, title: d} : {files: fs_, text: d}); }
   catch(e){ if(e.name !== "AbortError") toast("分享失敗，請改用連結"); }
 };
 render();
