@@ -96,8 +96,8 @@ const hkFmt = new Intl.DateTimeFormat("zh-HK", {timeZone:"Asia/Hong_Kong", month
 const hkTime = iso => { const o = Object.fromEntries(hkFmt.formatToParts(new Date(iso)).map(x => [x.type, x.value])); return o.month + "-" + o.day + " " + (o.hour==="24"?"00":o.hour) + ":" + o.minute; };
 const toItems = rows => rows.map(([cat,id,name,up]) => {
   const dm = name.match(/\d{4}-\d{2}-\d{2}/), date = dm ? dm[0] : "";
-  const rest = name.replace(date, "").replace(/\s+_+/, " ").replace(/^[\s_]+|[\s_]+$/g, "");   // 例：「[舊版備份] DE_行動卡」
-  const tk = name.split(/[_\s]+/).find(t => /^[A-Z]{1,5}$/.test(t)) || "";
+  const rest = name.replace(date, "").replace(/\s+_+/, " ").replace(/([-_\s])[-_\s]+/g, "$1").replace(/^[\s_-]+|[\s_-]+$/g, "");   // 例：「[舊版備份] DE_行動卡」
+  const tk = name.split(/[_\s-]+/).find(t => /^[A-Z]{1,5}$/.test(t)) || "";
   return {cat, id, name, up, date, title:rest || name, ticker:tk, url:link(id)};
 }).sort((a,b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
 let items = toItems(window.REPORTS);
@@ -115,7 +115,7 @@ function visible(){
   const q = state.q.trim().toLowerCase();
   return items.filter(r =>
     !state.deleted.has(r.id) && (state.showHidden || !state.hidden.has(r.id)) &&
-    (state.cat==="all" || r.cat===state.cat) &&
+    (state.cat==="all" || state.cat==="new" || r.cat===state.cat) &&
     (state.ticker==="all" || r.ticker===state.ticker) &&
     (!q || (r.name+" "+CATS[r.cat]).toLowerCase().includes(q)));
 }
@@ -131,19 +131,23 @@ function btns(el, entries, key){
 function esc(s){ return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 function render(){
-  btns($("#tabs"), [["all","全部"], ...Object.entries(CATS)], "cat");
-  const tickers = [...new Set(items.filter(r => !state.deleted.has(r.id) && (state.showHidden || !state.hidden.has(r.id))).filter(r => state.cat==="all"||r.cat===state.cat).map(r=>r.ticker).filter(Boolean))].sort();
+  btns($("#tabs"), [["all","全部"], ["new","🆕 最新上傳"], ...Object.entries(CATS)], "cat");
+  const tickers = [...new Set(items.filter(r => !state.deleted.has(r.id) && (state.showHidden || !state.hidden.has(r.id)) && (state.cat==="all" || state.cat==="new" || r.cat===state.cat)).map(r=>r.ticker).filter(Boolean))].sort();
   if(state.ticker!=="all" && !tickers.includes(state.ticker)) state.ticker="all";
   btns($("#chips"), [["all","所有股票"], ...tickers.map(t=>[t,t])], "ticker");
   $("#chips").style.display = tickers.length ? "" : "none";
 
-  const rows = visible(), byDate = {};
-  rows.forEach(r => (byDate[r.date] ||= []).push(r));
-  $("#list").innerHTML = rows.length ? Object.keys(byDate).sort().reverse().map(d =>
+  let rows = visible(), byDate = {};
+  if(state.cat === "new"){   // 按上傳時間（新→舊）列出最近 20 份，標題帶報告日期
+    rows = rows.slice().sort((a,b) => b.up.localeCompare(a.up)).slice(0,20);
+    rows.forEach(r => (byDate["最近上傳（按上傳時間，新→舊）"] ||= []).push(r));
+  } else rows.forEach(r => (byDate[r.date] ||= []).push(r));
+  const order = state.cat === "new" ? Object.keys(byDate) : Object.keys(byDate).sort().reverse();
+  $("#list").innerHTML = rows.length ? order.map(d =>
     `<div class="group"><h2>${d}</h2>` + byDate[d].map(r =>
       `<div class="item${state.sel.has(r.id)?" sel":""}${state.hidden.has(r.id)?" hid":""}" data-id="${r.id}">
         <input type="checkbox" ${state.sel.has(r.id)?"checked":""} aria-label="選取 ${esc(r.name)}">
-        <div class="t"><div class="n">${esc(r.title)}</div>
+        <div class="t"><div class="n">${state.cat==="new" ? esc(r.date + " ") : ""}${esc(r.title)}</div>
           <div class="m"><span class="tag">${CATS[r.cat]}</span>${state.hidden.has(r.id)?`<span class="tag">已隱藏</span>`:""}${r.ticker?`<span class="tag">${r.ticker}</span>`:""}<span class="up">上傳 ${hkTime(r.up)}（HKT）</span></div></div>
         <a class="open" href="${r.url}" target="_blank" rel="noopener">打開</a>
       </div>`).join("") + `</div>`).join("") : `<div class="empty">搵唔到相關報告</div>`;
