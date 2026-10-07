@@ -310,11 +310,21 @@ $("#up").onclick = () => $("#upfile").click();
 $("#upfile").onchange = async e => {
   const list = [...e.target.files]; e.target.value = "";
   if(!list.length) return;
-  const cat = $("#upcat").value; let ok = 0, fail = [];
+  const cat = $("#upcat").value; let ok = 0, fail = [], skipped = 0;
+  await syncDrive(false);   // 先同步一次，確保重複檢查用嘅係最新清單
+  const norm = s => s.replace(/\.pdf$/i, "").trim().toLowerCase();
+  const seen = new Set();   // 今次一齊揀嘅檔案之間都檢查重複
   for(let i = 0; i < list.length; i++){
-    const f = list[i]; toast("上傳中 " + (i+1) + "/" + list.length + "：" + f.name);
+    const f = list[i];
     try {
       if(!/\.pdf$/i.test(f.name)) throw new Error("唔係 PDF");
+      const same = items.find(x => !state.deleted.has(x.id) && norm(x.name) === norm(f.name));
+      if(same || seen.has(norm(f.name))){
+        const when = same ? "（已於 " + hkTime(same.up) + " HKT 上傳" + (state.hidden.has(same.id) ? "，目前已隱藏" : "") + "）" : "（今次一齊揀咗兩份同名檔案）";
+        if(!confirm("⚠ 重複上傳\n\n「" + f.name + "」已經存在" + when + "。\n\n繼續上傳嘅話 Drive 會有兩份同名檔案（網頁只會顯示較新嗰份）。\n\n要繼續上傳嗎？\n（取消 = 跳過呢個檔案）")){ skipped++; continue; }
+      }
+      seen.add(norm(f.name));
+      toast("上傳中 " + (i+1) + "/" + list.length + "：" + f.name);
       if(f.size > 30*1024*1024) throw new Error("超過 30MB");
       const r = await fetch("/api/upload?name=" + encodeURIComponent(f.name) + "&cat=" + cat, {method:"POST", headers:{"x-admin-password":state.pw, "Content-Type":"application/pdf"}, body:f});
       const j = await r.json().catch(() => ({}));
@@ -324,7 +334,7 @@ $("#upfile").onchange = async e => {
       ok++; updTotal(); render();
     } catch(err){ fail.push(f.name + "：" + err.message); }
   }
-  toast(fail.length ? "已上傳 " + ok + " 份，" + fail.length + " 份失敗 — " + fail[0] : "已上傳 " + ok + " 份");
+  toast((fail.length ? "已上傳 " + ok + " 份，" + fail.length + " 份失敗 — " + fail[0] : "已上傳 " + ok + " 份") + (skipped ? "，跳過 " + skipped + " 份重複" : ""));
 };
 (async () => {
   try {
