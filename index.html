@@ -143,7 +143,7 @@ function btns(el, entries, key){
 function esc(s){ return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 function render(){
-  btns($("#tabs"), [["all","全部"], ["new","🆕 最新上傳"], ...Object.entries(CATS), ["cov","✅ 覆蓋檢查"]], "cat");
+  btns($("#tabs"), [["all","全部"], ["new","🆕 最新上傳"], ["cov","✅ 覆蓋檢查"], ...Object.entries(CATS)], "cat");
   const isCov = state.cat === "cov";
   $("#cov").style.display = isCov ? "" : "none"; $("#list").style.display = isCov ? "none" : ""; document.querySelector(".tools").style.display = isCov ? "none" : "";
   if(isCov){ $("#chips").style.display = "none"; renderCov(); updateBar(); return; }
