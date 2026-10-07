@@ -45,6 +45,8 @@
   #cp,#clr{background:var(--line);color:var(--ink)}
   #adm{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:3px 10px;font:inherit;cursor:pointer}
   #adm.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  #up,#gconn{display:none;margin-left:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:3px 10px;font:inherit;cursor:pointer}
+  #upcat{display:none;margin-left:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:3px 6px;font:inherit}
   #showHid{display:none;margin-left:6px;font-size:13px}
   #hide,#del{display:none}
   #hide{background:var(--line);color:var(--ink)}
@@ -59,7 +61,10 @@
   <p>共 <span id="total"></span> 份報告 · 撳標題打開 PDF · 剔選後可直接 WhatsApp 分享 ·
     <a id="f1" target="_blank" rel="noopener">Drive 資料夾 1</a> / <a id="f2" target="_blank" rel="noopener">2</a>
     · <button id="sync" type="button">🔄 同步 Drive</button> <span id="syncAt"></span>
-    · <button id="adm" type="button">🔒 管理</button><label id="showHid"><input type="checkbox" id="showHidCb"> 顯示已隱藏</label></p>
+    · <button id="adm" type="button">🔒 管理</button><label id="showHid"><input type="checkbox" id="showHidCb"> 顯示已隱藏</label>
+    <button id="gconn" type="button">🔗 連接 Google</button>
+    <select id="upcat" aria-label="上傳類型"><option value="auto">自動判斷類型</option><option value="market">美股大盤</option><option value="daily">每日跨股總表</option><option value="stock">個股研究報告</option><option value="card">行動卡</option><option value="verify">核實報告</option></select>
+    <button id="up" type="button">⬆ 上傳報告</button><input type="file" id="upfile" accept="application/pdf,.pdf" multiple hidden></p>
 </header>
 <div class="wrap">
   <div class="tabs" id="tabs"></div>
@@ -98,7 +103,7 @@ const toItems = rows => rows.map(([cat,id,name,up]) => {
 let items = toItems(window.REPORTS);
 
 const $ = s => document.querySelector(s);
-const state = {cat:"all", ticker:"all", q:"", sel:new Set(), hidden:new Set(), deleted:new Set(), showHidden:false, pw:"", canDelete:false};
+const state = {cat:"all", ticker:"all", q:"", sel:new Set(), hidden:new Set(), deleted:new Set(), showHidden:false, pw:"", canDelete:false, canUpload:false, googleReady:false, googleConnected:false};
 try { const s = JSON.parse(localStorage.getItem("jlaw-sel")||"[]"); s.forEach(i => state.sel.add(i)); $("#phone").value = localStorage.getItem("jlaw-phone")||""; } catch(e){}
 
 const shown = () => items.filter(r => !state.deleted.has(r.id) && !state.hidden.has(r.id));
@@ -251,6 +256,9 @@ function adminUi(){
   const on = !!state.pw;
   $("#adm").textContent = on ? "🔓 管理中（退出）" : "🔒 管理"; $("#adm").classList.toggle("on", on);
   $("#showHid").style.display = on ? "inline" : "none";
+  $("#up").style.display = on && state.canUpload ? "inline-block" : "none";
+  $("#upcat").style.display = on && state.canUpload ? "inline-block" : "none";
+  $("#gconn").style.display = on && state.googleReady && !state.googleConnected ? "inline-block" : "none";
 }
 $("#adm").onclick = async () => {
   if(state.pw) return lock();
@@ -285,10 +293,40 @@ $("#del").onclick = async () => {
     toast(failed.length ? "已刪除 " + done + " 份，" + failed.length + " 份失敗：" + failed[0].error : "已刪除 " + done + " 份");
   } catch(e){ toast("刪除失敗：" + e.message); }
 };
+
+// ---- 連接 Google / 上傳報告 ----
+$("#gconn").onclick = async () => {
+  try {
+    const r = await api("/api/oauth/url");
+    if(!r.ok) throw new Error(r.j.error || r.status);
+    location.href = r.j.url;
+  } catch(e){ toast(e.message); }
+};
+$("#up").onclick = () => $("#upfile").click();
+$("#upfile").onchange = async e => {
+  const list = [...e.target.files]; e.target.value = "";
+  if(!list.length) return;
+  const cat = $("#upcat").value; let ok = 0, fail = [];
+  for(let i = 0; i < list.length; i++){
+    const f = list[i]; toast("上傳中 " + (i+1) + "/" + list.length + "：" + f.name);
+    try {
+      if(!/\.pdf$/i.test(f.name)) throw new Error("唔係 PDF");
+      if(f.size > 30*1024*1024) throw new Error("超過 30MB");
+      const r = await fetch("/api/upload?name=" + encodeURIComponent(f.name) + "&cat=" + cat, {method:"POST", headers:{"x-admin-password":state.pw, "Content-Type":"application/pdf"}, body:f});
+      const j = await r.json().catch(() => ({}));
+      if(r.status === 401){ lock(); throw new Error("密碼錯誤，已退出管理"); }
+      if(!r.ok) throw new Error(j.error || r.status);
+      items = toItems(items.map(x => [x.cat, x.id, x.name, x.up]).concat([j.row]));
+      ok++; updTotal(); render();
+    } catch(err){ fail.push(f.name + "：" + err.message); }
+  }
+  toast(fail.length ? "已上傳 " + ok + " 份，" + fail.length + " 份失敗 — " + fail[0] : "已上傳 " + ok + " 份");
+};
 (async () => {
   try {
     const j = await (await fetch("/api/hidden")).json();
-    state.canDelete = !!j.canDelete; applyVis(j);
+    state.canDelete = !!j.canDelete; state.canUpload = !!j.canUpload; state.googleReady = !!j.googleReady; state.googleConnected = !!j.googleConnected; applyVis(j);
+    if(new URLSearchParams(location.search).get("google") === "ok"){ history.replaceState(null, "", "/"); toast("已連接 Google"); }
     const pw = sessionStorage.getItem("jlaw-pw");
     if(pw){ state.pw = pw; const r = await api("/api/auth"); if(r.ok){ adminUi(); render(); } else lock(); }
   } catch(e){ state.pw = ""; }

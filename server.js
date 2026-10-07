@@ -103,7 +103,7 @@ let saTok = null;
 async function saToken() {
   if (saTok && saTok.exp > Date.now() + 60000) return saTok.v;
   const raw = process.env.GOOGLE_SA_JSON;
-  if (!raw) { const e = new Error("未設定 GOOGLE_SA_JSON"); e.code = 503; throw e; }
+  if (!raw) { const e = new Error("未連接 Google，無法刪除（請喺管理模式撳「連接 Google」）"); e.code = 503; throw e; }
   const sa = JSON.parse(raw.trim().startsWith("{") ? raw : Buffer.from(raw, "base64").toString());
   const b64 = o => Buffer.from(JSON.stringify(o)).toString("base64url");
   const now = Math.floor(Date.now() / 1000);
@@ -118,13 +118,89 @@ async function saToken() {
 }
 async function trash(id) {
   const r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?supportsAllDrives=true&fields=id,trashed`, {
-    method: "PATCH", headers: {Authorization: "Bearer " + await saToken(), "Content-Type": "application/json"}, body: JSON.stringify({trashed: true})});
+    method: "PATCH", headers: {Authorization: "Bearer " + await bearer(), "Content-Type": "application/json"}, body: JSON.stringify({trashed: true})});
   if (!r.ok) throw new Error("Drive " + r.status + " " + (await r.text()).slice(0, 160));
 }
 const visJson = () => ({hidden: [...vis.hidden], deleted: [...vis.deleted]});
 
+// ---- Google 授權（你本人帳戶）：上傳 + 刪除 ----
+const G_ID = process.env.GOOGLE_CLIENT_ID || "", G_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
+const TOKEN_FILE = path.join(DATA_DIR, "google-token.json");
+let refreshToken = process.env.GOOGLE_REFRESH_TOKEN || (() => { try { return JSON.parse(fs.readFileSync(TOKEN_FILE, "utf8")).refresh_token || ""; } catch (e) { return ""; } })();
+let userTok = null;
+const oauthStates = new Map(); // state -> expiry
+const googleConnected = () => !!(G_ID && G_SECRET && refreshToken);
+async function userToken() {
+  if (userTok && userTok.exp > Date.now() + 60000) return userTok.v;
+  const r = await fetch("https://oauth2.googleapis.com/token", {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({grant_type: "refresh_token", refresh_token: refreshToken, client_id: G_ID, client_secret: G_SECRET})});
+  const j = await r.json();
+  if (!r.ok) { userTok = null; throw new Error("Google 授權失敗：" + (j.error_description || j.error) + "（請重新連接 Google）"); }
+  userTok = {v: j.access_token, exp: Date.now() + j.expires_in * 1000};
+  return userTok.v;
+}
+const bearer = async () => googleConnected() ? userToken() : saToken();
+const redirectUri = req => `${(req.headers["x-forwarded-proto"] || "http").split(",")[0]}://${(req.headers["x-forwarded-host"] || req.headers.host).split(",")[0]}/oauth/callback`;
+
+const FOLDER_BY_CAT = {
+  card: "1k0bxCss7lazu5Ozq6FX1oKUt-qbv5ZtU", stock: "1kIGilWMZYxBvfBpKbxOTVE8kJ4a_MnEb", verify: "1uVDlxdVLhrA6PWB-EsR5wRcPPskXTAog",
+  market: "18yWn2hUykKaKru44HavWutfUST9Dux6_", daily: "1AeIL4vlhY5dqij_wtIF9paB0-cadqowE",
+};
+const detectCat = n => /每日跨股總表/.test(n) ? "daily" : /行動卡/.test(n) ? "card" : /核對附錄|核實/.test(n) ? "verify" : /股票分析|個股/.test(n) ? "stock" : /大盤/.test(n) ? "market" : "";
+function rawBody(req, max) {
+  return new Promise((resolve, reject) => {
+    let n = 0; const chunks = [];
+    req.on("data", c => { n += c.length; if (n > max) { reject(Object.assign(new Error("檔案太大（上限 " + (max >> 20) + "MB）"), {code: 413})); req.destroy(); } else chunks.push(c); });
+    req.on("end", () => resolve(Buffer.concat(chunks))); req.on("error", reject);
+  });
+}
+async function upload(req, res, url) {
+  if (!googleConnected()) return json(res, 503, {error: "未連接 Google（上傳需要你嘅 Google 授權）"});
+  const name = (url.searchParams.get("name") || "").replace(/[\\/\r\n]/g, "_").trim();
+  if (!/\.pdf$/i.test(name)) return json(res, 400, {error: "只可以上傳 PDF"});
+  let cat = url.searchParams.get("cat") || "auto"; if (cat === "auto") cat = detectCat(name);
+  if (!FOLDER_BY_CAT[cat]) return json(res, 400, {error: "無法判斷類型，請手動揀選類型"});
+  let buf; try { buf = await rawBody(req, 30 << 20); } catch (e) { return json(res, e.code || 400, {error: e.message}); }
+  if (buf.slice(0, 4).toString() !== "%PDF") return json(res, 400, {error: "唔係有效嘅 PDF 檔案"});
+  const tok = await userToken(), boundary = "jl" + crypto.randomBytes(8).toString("hex");
+  const meta = JSON.stringify({name, parents: [FOLDER_BY_CAT[cat]]});
+  const payload = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`), buf, Buffer.from(`\r\n--${boundary}--`)]);
+  const r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,createdTime", {
+    method: "POST", headers: {Authorization: "Bearer " + tok, "Content-Type": "multipart/related; boundary=" + boundary}, body: payload});
+  if (!r.ok) return json(res, 502, {error: "Drive " + r.status + " " + (await r.text()).slice(0, 160)});
+  const f = await r.json();
+  // 令 PDF 可經連結查看（與現有報告一致），失敗唔影響上傳
+  try { await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}/permissions?supportsAllDrives=true`, {method: "POST", headers: {Authorization: "Bearer " + tok, "Content-Type": "application/json"}, body: JSON.stringify({role: "reader", type: "anyone"})}); } catch (e) {}
+  known.add(f.id); cache = null;
+  json(res, 200, {row: [cat, f.id, f.name.replace(/\.pdf$/i, ""), f.createdTime]});
+}
+async function oauth(req, res, p, url) {
+  if (p === "/api/oauth/url") {
+    if (req.method !== "POST") return json(res, 405, {error: "method"});
+    if (!ADMIN) return json(res, 503, {error: "未設定 ADMIN_PASSWORD"});
+    const a = authed(req); if (a !== 200) return json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"});
+    if (!G_ID || !G_SECRET) return json(res, 503, {error: "未設定 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET"});
+    const state = crypto.randomBytes(16).toString("hex"); oauthStates.set(state, Date.now() + 600000);
+    const u = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+    u.search = new URLSearchParams({client_id: G_ID, redirect_uri: redirectUri(req), response_type: "code", scope: "https://www.googleapis.com/auth/drive", access_type: "offline", prompt: "consent", state});
+    return json(res, 200, {url: u.toString(), redirectUri: redirectUri(req)});
+  }
+  // /oauth/callback
+  const state = url.searchParams.get("state"), code = url.searchParams.get("code");
+  const exp = oauthStates.get(state); oauthStates.delete(state);
+  const page = (msg, ok) => { res.writeHead(ok ? 302 : 400, ok ? {Location: "/?google=ok"} : {"Content-Type": "text/plain; charset=utf-8"}); res.end(ok ? "" : msg); };
+  if (!exp || exp < Date.now() || !code) return page("授權已過期或無效，請返回網頁重新撳「連接 Google」。", false);
+  const r = await fetch("https://oauth2.googleapis.com/token", {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: new URLSearchParams({grant_type: "authorization_code", code, client_id: G_ID, client_secret: G_SECRET, redirect_uri: redirectUri(req)})});
+  const j = await r.json();
+  if (!r.ok || !j.refresh_token) return page("Google 授權失敗：" + (j.error_description || j.error || "沒有取得 refresh token（請移除舊授權後重試）"), false);
+  refreshToken = j.refresh_token; userTok = null;
+  fs.writeFileSync(TOKEN_FILE, JSON.stringify({refresh_token: refreshToken}), {mode: 0o600});
+  page("", true);
+}
+
 async function admin(req, res, p) {
-  if (p === "/api/hidden" && req.method === "GET") return json(res, 200, {...visJson(), adminEnabled: !!ADMIN, canDelete: !!process.env.GOOGLE_SA_JSON});
+  if (p === "/api/hidden" && req.method === "GET") return json(res, 200, {...visJson(), adminEnabled: !!ADMIN, canDelete: googleConnected() || !!process.env.GOOGLE_SA_JSON, canUpload: googleConnected(), googleReady: !!(G_ID && G_SECRET), googleConnected: googleConnected()});
   if (req.method !== "POST") return json(res, 405, {error: "method"});
   if (!ADMIN) return json(res, 503, {error: "未設定 ADMIN_PASSWORD"});
   const a = authed(req); if (a !== 200) return json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"});
@@ -143,13 +219,20 @@ async function admin(req, res, p) {
       catch (e) { failed.push({id, error: e.message}); if (e.code === 503) break; }
     }
     if (done.length) { cache = null; saveVis(); }
-    return json(res, failed.length && !done.length ? (failed[0].error.includes("GOOGLE_SA_JSON") ? 503 : 502) : 200, {...visJson(), done, failed});
+    return json(res, failed.length && !done.length ? (failed[0].error.includes("連接 Google") ? 503 : 502) : 200, {...visJson(), done, failed});
   }
   json(res, 404, {error: "not found"});
 }
 
 http.createServer(async (req, res) => {
   const p = req.url.split("?")[0];
+  const url = new URL(req.url, "http://x");
+  if (p === "/api/upload" && req.method === "POST") {
+    if (!ADMIN) return json(res, 503, {error: "未設定 ADMIN_PASSWORD"});
+    const a = authed(req); if (a !== 200) return json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"});
+    return upload(req, res, url).catch(e => { console.error("upload failed", e.message); json(res, 500, {error: e.message}); });
+  }
+  if (p === "/api/oauth/url" || p === "/oauth/callback") return oauth(req, res, p, url).catch(e => { console.error("oauth failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/hidden" || p === "/api/auth" || p === "/api/hide" || p === "/api/delete") return admin(req, res, p).catch(e => { console.error("admin failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/sync") {
     try { json(res, 200, {rows: await sync(true)}); }
