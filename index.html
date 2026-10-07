@@ -56,7 +56,16 @@
   #cov .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
   #cov select,#cov input[type=date],#cov button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 9px;font:inherit}
   #cov button.on{background:var(--brand);border-color:var(--brand);color:#fff}
-  #cov .sum{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
+  #cov .sum{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0}
+  #cov .sum .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
+  #cov .sum .dt{font-size:18px;font-weight:700}
+  #cov .sum .mut{font-size:13px;color:var(--mute);white-space:nowrap}
+  #cov .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  #cov .st{border:1px solid var(--line);border-radius:10px;padding:10px 4px;text-align:center;background:var(--bg)}
+  #cov .st b{display:block;font-size:26px;line-height:1.1}
+  #cov .st span{display:block;font-size:12px;color:var(--mute);margin-top:2px}
+  #cov .st.g b{color:#16a34a} #cov .st.a b{color:#d97706} #cov .st.r b{color:#dc2626}
+  #cov .sum .mk{font-size:12px;color:var(--mute);margin-top:10px}
   #cov table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:14px}
   #cov th,#cov td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:center}
   #cov th:first-child,#cov td:first-child{text-align:left}
@@ -416,11 +425,12 @@ function renderCov(){
     (cov.scope === "day" ? '<select id="covDay">' + d.days.map(x => '<option' + (x===cov.day?" selected":"") + '>' + x + '</option>').join("") + '</select>'
                          : '<input type="date" id="covSince" value="' + cov.since + '">') +
     '<button id="covReload">🔄 重新讀取表格</button></div>' +
-    '<div class="sum"><b>' + scopeLabel + '</b>　清單 ' + all.length + ' 隻　✅ 三樣齊 <b>' + ok.length + '</b>　⚠ 欠部分 <b>' + part.length + '</b>　❌ 全冇 <b>' + none.length + '</b>' +
-    (d.market ? '<div class="note">美股大盤分析最新：' + d.market + '</div>' : '') + '</div>' +
-    '<div class="bar">' + fbtn("miss","欠任何一樣") + fbtn("none","全冇") + fbtn("ok","齊晒") + fbtn("all","全部") + '<button id="covCopy">複製欠嘅清單</button><button id="covWa">WhatsApp</button></div>' +
+    '<div class="sum"><div class="hd"><span class="dt">' + scopeLabel + '</span><span class="mut">清單 ' + all.length + ' 隻</span></div>' +
+    '<div class="stats"><div class="st g"><b>' + ok.length + '</b><span>✅ 三樣齊</span></div><div class="st a"><b>' + part.length + '</b><span>⚠ 欠部分</span></div><div class="st r"><b>' + none.length + '</b><span>❌ 全無</span></div></div>' +
+    (d.market ? '<div class="mk">美股大盤分析最新：' + d.market + '</div>' : '') + '</div>' +
+    '<div class="bar">' + fbtn("miss","欠任何一樣") + fbtn("none","全無") + fbtn("ok","齊晒") + fbtn("all","全部") + '<button id="covCopy">複製欠嘅清單</button><button id="covWa">WhatsApp</button></div>' +
     '<table><tr><th>股票 / 負責人</th><th>個股</th><th>行動卡</th><th>核實</th></tr>' +
-    (shownRows.map(x => '<tr><td><span class="tk">' + esc(x.ticker) + '</span> <span class="co">' + esc(x.name) + '</span><div class="co">' + esc(x.theme) + (x.owner ? " · " + esc(x.owner) : " · 未有人認領") + '</div></td><td>' + mark(x.s) + '</td><td>' + mark(x.c) + '</td><td>' + mark(x.v) + '</td></tr>').join("") || '<tr><td colspan="4">冇符合條件嘅股票 🎉</td></tr>') + '</table>' +
+    (shownRows.map(x => '<tr><td><span class="tk">' + esc(x.ticker) + '</span> <span class="co">' + esc(x.name) + '</span><div class="co">' + esc(x.theme) + (x.owner ? " · " + esc(x.owner) : " · 未有人認領") + '</div></td><td>' + mark(x.s) + '</td><td>' + mark(x.c) + '</td><td>' + mark(x.v) + '</td></tr>').join("") || '<tr><td colspan="4">無符合條件嘅股票 🎉</td></tr>') + '</table>' +
     (d.extras.length ? '<p class="note">不在表格清單但有報告：' + d.extras.map(esc).join("、") + '</p>' : '') +
     '<p class="note">按檔名入面嘅股票代號配對；單日模式只計表格「Added Date」當日或之前加入嘅股票。</p>';
   el.querySelectorAll("[data-s]").forEach(b => b.onclick = () => { cov.scope = b.dataset.s; renderCov(); });
