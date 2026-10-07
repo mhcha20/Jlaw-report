@@ -52,6 +52,16 @@
   #hide{background:var(--line);color:var(--ink)}
   #del{background:#dc2626;color:#fff}
   .item.hid{opacity:.55}
+  #cov h3{font-size:15px;margin:14px 0 6px}
+  #cov .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+  #cov select,#cov input[type=date],#cov button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 9px;font:inherit}
+  #cov button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  #cov .sum{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
+  #cov table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:14px}
+  #cov th,#cov td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:center}
+  #cov th:first-child,#cov td:first-child{text-align:left}
+  #cov .tk{font-weight:700} #cov .co{font-size:11px;color:var(--mute)} #cov .ok{color:#16a34a} #cov .no{color:#dc2626;font-weight:700}
+  #cov .note{font-size:12px;color:var(--mute);margin:6px 0}
   #toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:#111;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;display:none}
 </style>
 </head>
@@ -74,6 +84,7 @@
     <button id="selAll">全選當前</button>
   </div>
   <div id="list"></div>
+  <div id="cov" style="display:none"></div>
 </div>
 
 <div id="bar"><div class="in">
@@ -95,8 +106,9 @@ const link = id => "https://drive.google.com/file/d/" + id + "/view";
 const hkFmt = new Intl.DateTimeFormat("zh-HK", {timeZone:"Asia/Hong_Kong", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", hour12:false});
 const hkTime = iso => { const o = Object.fromEntries(hkFmt.formatToParts(new Date(iso)).map(x => [x.type, x.value])); return o.month + "-" + o.day + " " + (o.hour==="24"?"00":o.hour) + ":" + o.minute; };
 const toItems = rows => rows.map(([cat,id,name,up]) => {
-  const dm = name.match(/\d{4}-\d{2}-\d{2}/), date = dm ? dm[0] : "";
-  const rest = name.replace(date, "").replace(/\s+_+/, " ").replace(/([-_\s])[-_\s]+/g, "$1").replace(/^[\s_-]+|[\s_-]+$/g, "");   // 例：「[舊版備份] DE_行動卡」
+  const dm = name.match(/\d{4}-\d{2}-\d{2}/) || name.match(/(?<!\d)20\d{6}(?!\d)/);
+  const date = dm ? (dm[0].includes("-") ? dm[0] : dm[0].replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3")) : "";
+  const rest = name.replace(dm ? dm[0] : "", "").replace(/\s+_+/, " ").replace(/([-_\s])[-_\s]+/g, "$1").replace(/^[\s_-]+|[\s_-]+$/g, "");   // 例：「[舊版備份] DE_行動卡」
   const tk = name.split(/[_\s-]+/).find(t => /^[A-Z]{1,5}$/.test(t)) || "";
   return {cat, id, name, up, date, title:rest || name, ticker:tk, url:link(id)};
 }).sort((a,b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
@@ -124,14 +136,17 @@ function btns(el, entries, key){
   entries.forEach(([v,label]) => {
     const b = document.createElement("button");
     b.textContent = label; if(state[key]===v) b.className = "on";
-    b.onclick = () => { state[key]=v; render(); };
+    b.onclick = async () => { if(v === "cov" && !state.pw){ await doUnlock(); if(!state.pw) return; } state[key]=v; render(); if(v === "cov") loadSheet(false); };
     el.appendChild(b);
   });
 }
 function esc(s){ return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 function render(){
-  btns($("#tabs"), [["all","全部"], ["new","🆕 最新上傳"], ...Object.entries(CATS)], "cat");
+  btns($("#tabs"), [["all","全部"], ["new","🆕 最新上傳"], ...Object.entries(CATS), ["cov","✅ 覆蓋檢查"]], "cat");
+  const isCov = state.cat === "cov";
+  $("#cov").style.display = isCov ? "" : "none"; $("#list").style.display = isCov ? "none" : ""; document.querySelector(".tools").style.display = isCov ? "none" : "";
+  if(isCov){ $("#chips").style.display = "none"; renderCov(); updateBar(); return; }
   const tickers = [...new Set(items.filter(r => !state.deleted.has(r.id) && (state.showHidden || !state.hidden.has(r.id)) && (state.cat==="all" || state.cat==="new" || r.cat===state.cat)).map(r=>r.ticker).filter(Boolean))].sort();
   if(state.ticker!=="all" && !tickers.includes(state.ticker)) state.ticker="all";
   btns($("#chips"), [["all","所有股票"], ...tickers.map(t=>[t,t])], "ticker");
@@ -255,7 +270,7 @@ async function api(path, payload){
   return {ok:r.ok, status:r.status, j};
 }
 function applyVis(j){ state.hidden = new Set(j.hidden||[]); state.deleted = new Set(j.deleted||[]); [...state.sel].forEach(i => { if(state.deleted.has(i)) state.sel.delete(i); }); updTotal(); persist(); render(); }
-function lock(){ state.pw = ""; try{ sessionStorage.removeItem("jlaw-pw"); }catch(e){} state.showHidden = false; $("#showHidCb").checked = false; adminUi(); render(); }
+function lock(){ if(state.cat === "cov") state.cat = "all"; state.pw = ""; try{ sessionStorage.removeItem("jlaw-pw"); }catch(e){} state.showHidden = false; $("#showHidCb").checked = false; adminUi(); render(); }
 function adminUi(){
   const on = !!state.pw;
   $("#adm").textContent = on ? "🔓 管理中（退出）" : "🔒 管理"; $("#adm").classList.toggle("on", on);
@@ -264,8 +279,8 @@ function adminUi(){
   $("#upcat").style.display = on && state.canUpload ? "inline-block" : "none";
   $("#gconn").style.display = on && state.googleReady && !state.googleConnected ? "inline-block" : "none";
 }
-$("#adm").onclick = async () => {
-  if(state.pw) return lock();
+$("#adm").onclick = async () => { if(state.pw) return lock(); await doUnlock(); };
+async function doUnlock(){
   const pw = prompt("請輸入管理密碼"); if(!pw) return;
   state.pw = pw;
   try {
@@ -274,7 +289,7 @@ $("#adm").onclick = async () => {
     try{ sessionStorage.setItem("jlaw-pw", pw); }catch(e){}
     adminUi(); render(); toast("已進入管理模式");
   } catch(e){ state.pw = ""; adminUi(); toast(e.message); }
-};
+}
 $("#showHidCb").onchange = e => { state.showHidden = e.target.checked; render(); };
 $("#hide").onclick = async () => {
   const rows = selected(), restore = rows.every(r => state.hidden.has(r.id));
@@ -336,6 +351,86 @@ $("#upfile").onchange = async e => {
   }
   toast((fail.length ? "已上傳 " + ok + " 份，" + fail.length + " 份失敗 — " + fail[0] : "已上傳 " + ok + " 份") + (skipped ? "，跳過 " + skipped + " 份重複" : ""));
 };
+
+// ---- 覆蓋檢查：表格股票清單 vs Drive 報告 ----
+const cov = {sheet:null, err:"", loading:false, scope:"day", day:"", since:"2026-10-01", filter:"miss"};
+function parseCsv(t){
+  const rows = []; let row = [], f = "", q = false;
+  for(let i = 0; i < t.length; i++){
+    const c = t[i];
+    if(q){ if(c === '"'){ if(t[i+1] === '"'){ f += '"'; i++; } else q = false; } else f += c; }
+    else if(c === '"') q = true;
+    else if(c === ","){ row.push(f); f = ""; }
+    else if(c === "\n"){ row.push(f); rows.push(row); row = []; f = ""; }
+    else if(c !== "\r") f += c;
+  }
+  if(f || row.length){ row.push(f); rows.push(row); }
+  return rows;
+}
+async function loadSheet(force){
+  if(cov.loading || (cov.sheet && !force)) return;
+  cov.loading = true; cov.err = ""; renderCov();
+  try {
+    const r = await fetch("/api/sheet", {headers:{"x-admin-password":state.pw}}); const j = await r.json().catch(() => ({}));
+    if(r.status === 401){ lock(); throw new Error("密碼錯誤，已退出管理"); }
+    if(!r.ok) throw new Error(j.error || r.status);
+    cov.sheet = parseCsv(j.csv).slice(1).map(c => ({theme:(c[0]||"").trim(), name:(c[1]||"").trim(), ticker:(c[2]||"").trim().toUpperCase(), added:(c[3]||"").trim(), owner:(c[4]||"").trim()}))
+      .filter(x => x.ticker && x.ticker !== "大盤分析" && x.ticker !== "TICKER SYMBOL");
+    cov.at = j.at;
+  } catch(e){ cov.err = e.message; }
+  cov.loading = false; renderCov();
+}
+const hkToday = () => new Date(Date.now() + 8*3600e3).toISOString().slice(0,10);
+function covCompute(){
+  const set = new Set(cov.sheet.map(x => x.ticker));
+  const live = items.filter(r => !state.deleted.has(r.id) && r.date);
+  const tickerOf = r => r.name.split(/[\s_\-()\[\]]+/).map(t => t.toUpperCase()).find(t => set.has(t)) || "";
+  const typed = live.filter(r => r.cat === "stock" || r.cat === "card" || r.cat === "verify");
+  const today = hkToday();
+  const days = [...new Set(typed.map(r => r.date).filter(d => d <= today))].sort().reverse();
+  if(!cov.day || !days.includes(cov.day)) cov.day = days[0] || "";
+  const inScope = d => cov.scope === "day" ? d === cov.day : d >= cov.since;
+  const has = {stock:new Set(), card:new Set(), verify:new Set()}, extras = new Set();
+  typed.filter(r => inScope(r.date)).forEach(r => { const t = tickerOf(r); if(t) has[r.cat].add(t); else if(r.ticker) extras.add(r.ticker); });
+  const req = cov.sheet.filter(x => cov.scope === "since" || !x.added || x.added <= cov.day);
+  const rows = req.map(x => ({...x, s:has.stock.has(x.ticker), c:has.card.has(x.ticker), v:has.verify.has(x.ticker)}));
+  rows.forEach(x => { x.n = (x.s?1:0) + (x.c?1:0) + (x.v?1:0); });
+  const mk = live.filter(r => r.cat === "market").map(r => r.date).sort().pop() || "";
+  return {rows, days, extras:[...extras].sort(), market:mk};
+}
+function renderCov(){
+  const el = $("#cov"); if(state.cat !== "cov") return;
+  if(cov.loading){ el.innerHTML = '<p class="note">讀取表格中…</p>'; return; }
+  if(cov.err){ el.innerHTML = '<p class="note">⚠ ' + esc(cov.err) + '</p><button id="covRetry">重試</button>'; $("#covRetry").onclick = () => loadSheet(true); return; }
+  if(!cov.sheet){ el.innerHTML = '<p class="note">未載入</p>'; return; }
+  const d = covCompute(), all = d.rows;
+  const ok = all.filter(x => x.n === 3), none = all.filter(x => x.n === 0), part = all.filter(x => x.n > 0 && x.n < 3);
+  const scopeLabel = cov.scope === "day" ? cov.day : cov.since + " 起";
+  const miss = (k, label) => { const l = all.filter(x => !x[k]).map(x => x.ticker); return l.length ? "欠" + label + "（" + l.length + "）：" + l.join("、") : ""; };
+  const text = "【" + scopeLabel + " 報告覆蓋】\n" + [miss("s","個股研究"), miss("c","行動卡"), miss("v","核實報告")].filter(Boolean).join("\n");
+  const shownRows = all.filter(x => cov.filter === "all" || (cov.filter === "miss" && x.n < 3) || (cov.filter === "none" && x.n === 0) || (cov.filter === "ok" && x.n === 3));
+  const mark = v => v ? '<span class="ok">✓</span>' : '<span class="no">✗</span>';
+  const fbtn = (k, l) => '<button data-f="' + k + '" class="' + (cov.filter === k ? "on" : "") + '">' + l + '</button>';
+  el.innerHTML =
+    '<div class="bar"><button data-s="day" class="' + (cov.scope==="day"?"on":"") + '">單日</button><button data-s="since" class="' + (cov.scope==="since"?"on":"") + '">自某日起</button>' +
+    (cov.scope === "day" ? '<select id="covDay">' + d.days.map(x => '<option' + (x===cov.day?" selected":"") + '>' + x + '</option>').join("") + '</select>'
+                         : '<input type="date" id="covSince" value="' + cov.since + '">') +
+    '<button id="covReload">🔄 重新讀取表格</button></div>' +
+    '<div class="sum"><b>' + scopeLabel + '</b>　清單 ' + all.length + ' 隻　✅ 三樣齊 <b>' + ok.length + '</b>　⚠ 欠部分 <b>' + part.length + '</b>　❌ 全冇 <b>' + none.length + '</b>' +
+    (d.market ? '<div class="note">美股大盤分析最新：' + d.market + '</div>' : '') + '</div>' +
+    '<div class="bar">' + fbtn("miss","欠任何一樣") + fbtn("none","全冇") + fbtn("ok","齊晒") + fbtn("all","全部") + '<button id="covCopy">複製欠嘅清單</button><button id="covWa">WhatsApp</button></div>' +
+    '<table><tr><th>股票 / 負責人</th><th>個股</th><th>行動卡</th><th>核實</th></tr>' +
+    (shownRows.map(x => '<tr><td><span class="tk">' + esc(x.ticker) + '</span> <span class="co">' + esc(x.name) + '</span><div class="co">' + esc(x.theme) + (x.owner ? " · " + esc(x.owner) : " · 未有人認領") + '</div></td><td>' + mark(x.s) + '</td><td>' + mark(x.c) + '</td><td>' + mark(x.v) + '</td></tr>').join("") || '<tr><td colspan="4">冇符合條件嘅股票 🎉</td></tr>') + '</table>' +
+    (d.extras.length ? '<p class="note">不在表格清單但有報告：' + d.extras.map(esc).join("、") + '</p>' : '') +
+    '<p class="note">按檔名入面嘅股票代號配對；單日模式只計表格「Added Date」當日或之前加入嘅股票。</p>';
+  el.querySelectorAll("[data-s]").forEach(b => b.onclick = () => { cov.scope = b.dataset.s; renderCov(); });
+  el.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { cov.filter = b.dataset.f; renderCov(); });
+  if($("#covDay")) $("#covDay").onchange = e => { cov.day = e.target.value; renderCov(); };
+  if($("#covSince")) $("#covSince").onchange = e => { if(e.target.value){ cov.since = e.target.value; renderCov(); } };
+  $("#covReload").onclick = () => loadSheet(true);
+  $("#covCopy").onclick = async () => { try{ await navigator.clipboard.writeText(text); toast("已複製"); }catch(e){ toast("複製失敗"); } };
+  $("#covWa").onclick = () => window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
+}
 (async () => {
   try {
     const j = await (await fetch("/api/hidden")).json();

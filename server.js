@@ -199,6 +199,20 @@ async function oauth(req, res, p, url) {
   page("", true);
 }
 
+// ---- 覆蓋檢查：讀取你嘅 Google Sheet（第一個分頁）----
+const SHEET_ID = process.env.SHEET_ID || "1da207nad2cL2hN4vRLNtsOt2UXwgVTzMvoXS3VF98Fw";
+let sheetCache = null;
+async function sheetCsv(req, res) {
+  if (!ADMIN) return json(res, 503, {error: "未設定 ADMIN_PASSWORD"});
+  const a = authed(req); if (a !== 200) return json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"});
+  if (!googleConnected()) return json(res, 503, {error: "未連接 Google（請喺管理模式撳「連接 Google」）"});
+  if (sheetCache && Date.now() - sheetCache.at < 60000) return json(res, 200, {csv: sheetCache.csv, at: sheetCache.at});
+  const r = await fetch(`https://www.googleapis.com/drive/v3/files/${SHEET_ID}/export?mimeType=text/csv`, {headers: {Authorization: "Bearer " + await userToken()}});
+  if (!r.ok) return json(res, 502, {error: "讀取表格失敗：Drive " + r.status + " " + (await r.text()).slice(0, 160)});
+  sheetCache = {at: Date.now(), csv: await r.text()};
+  json(res, 200, {csv: sheetCache.csv, at: sheetCache.at});
+}
+
 async function admin(req, res, p) {
   if (p === "/api/hidden" && req.method === "GET") return json(res, 200, {...visJson(), adminEnabled: !!ADMIN, canDelete: googleConnected() || !!process.env.GOOGLE_SA_JSON, canUpload: googleConnected(), googleReady: !!(G_ID && G_SECRET), googleConnected: googleConnected()});
   if (req.method !== "POST") return json(res, 405, {error: "method"});
@@ -232,6 +246,7 @@ http.createServer(async (req, res) => {
     const a = authed(req); if (a !== 200) return json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"});
     return upload(req, res, url).catch(e => { console.error("upload failed", e.message); json(res, 500, {error: e.message}); });
   }
+  if (p === "/api/sheet" && req.method === "GET") return sheetCsv(req, res).catch(e => { console.error("sheet failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/oauth/url" || p === "/oauth/callback") return oauth(req, res, p, url).catch(e => { console.error("oauth failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/hidden" || p === "/api/auth" || p === "/api/hide" || p === "/api/delete") return admin(req, res, p).catch(e => { console.error("admin failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/sync") {
