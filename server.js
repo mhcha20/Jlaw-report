@@ -21,7 +21,7 @@ async function list(folderId) {
     const u = new URL("https://www.googleapis.com/drive/v3/files");
     u.search = new URLSearchParams({
       q: `'${folderId}' in parents and trashed=false`, key: KEY, pageSize: "1000",
-      fields: "nextPageToken,files(id,name,mimeType,createdTime)", ...(token && {pageToken: token}),
+      fields: "nextPageToken,files(id,name,mimeType,createdTime,size)", ...(token && {pageToken: token}),
     });
     const r = await fetch(u);
     if (!r.ok) throw new Error("Drive API " + r.status + " " + (await r.text()).slice(0, 200));
@@ -32,7 +32,7 @@ async function list(folderId) {
 async function walk(folderId, cat, rows) {
   for (const f of await list(folderId)) {
     if (f.mimeType === "application/vnd.google-apps.folder") await walk(f.id, SUBFOLDER_CAT[f.name] || "other", rows);
-    else if (f.mimeType === "application/pdf") rows.push([catOf(f.name, cat), f.id, f.name.replace(/\.pdf$/i, ""), f.createdTime]);
+    else if (f.mimeType === "application/pdf") rows.push([catOf(f.name, cat), f.id, f.name.replace(/\.pdf$/i, ""), f.createdTime, Number(f.size) || 0]);
   }
 }
 async function sync(force) {
@@ -165,14 +165,14 @@ async function upload(req, res, url) {
   const tok = await userToken(), boundary = "jl" + crypto.randomBytes(8).toString("hex");
   const meta = JSON.stringify({name, parents: [FOLDER_BY_CAT[cat]]});
   const payload = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`), buf, Buffer.from(`\r\n--${boundary}--`)]);
-  const r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,createdTime", {
+  const r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,createdTime,size", {
     method: "POST", headers: {Authorization: "Bearer " + tok, "Content-Type": "multipart/related; boundary=" + boundary}, body: payload});
   if (!r.ok) return json(res, 502, {error: "Drive " + r.status + " " + (await r.text()).slice(0, 160)});
   const f = await r.json();
   // 令 PDF 可經連結查看（與現有報告一致），失敗唔影響上傳
   try { await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}/permissions?supportsAllDrives=true`, {method: "POST", headers: {Authorization: "Bearer " + tok, "Content-Type": "application/json"}, body: JSON.stringify({role: "reader", type: "anyone"})}); } catch (e) {}
   known.add(f.id); cache = null;
-  json(res, 200, {row: [cat, f.id, f.name.replace(/\.pdf$/i, ""), f.createdTime]});
+  json(res, 200, {row: [cat, f.id, f.name.replace(/\.pdf$/i, ""), f.createdTime, Number(f.size) || buf.length]});
 }
 async function oauth(req, res, p, url) {
   if (p === "/api/oauth/url") {

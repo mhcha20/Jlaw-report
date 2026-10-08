@@ -31,6 +31,8 @@
   .item .m{font-size:12px;color:var(--mute)}
   .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:6px;background:var(--line);margin-right:4px}
   .up{margin-left:2px}
+  .rt{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .szt{font-size:12px;color:var(--mute);white-space:nowrap}
   .open{flex:none;color:var(--brand);text-decoration:none;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:5px 10px}
   .empty{text-align:center;color:var(--mute);padding:40px 0}
   #bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:none}
@@ -114,12 +116,13 @@ const CATS = {market:"美股大盤", daily:"每日跨股總表", stock:"個股�
 const link = id => "https://drive.google.com/file/d/" + id + "/view";
 const hkFmt = new Intl.DateTimeFormat("zh-HK", {timeZone:"Asia/Hong_Kong", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", hour12:false});
 const hkTime = iso => { const o = Object.fromEntries(hkFmt.formatToParts(new Date(iso)).map(x => [x.type, x.value])); return o.month + "-" + o.day + " " + (o.hour==="24"?"00":o.hour) + ":" + o.minute; };
-const toItems = rows => rows.map(([cat,id,name,up]) => {
+const fmtSize = n => !n ? "" : n < 1048576 ? Math.max(1, Math.round(n/1024)) + " KB" : (n/1048576).toFixed(1) + " MB";
+const toItems = rows => rows.map(([cat,id,name,up,size]) => {
   const dm = name.match(/\d{4}-\d{2}-\d{2}/) || name.match(/(?<!\d)20\d{6}(?!\d)/);
   const date = dm ? (dm[0].includes("-") ? dm[0] : dm[0].replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3")) : "";
   const rest = name.replace(dm ? dm[0] : "", "").replace(/\s+_+/, " ").replace(/([-_\s])[-_\s]+/g, "$1").replace(/^[\s_-]+|[\s_-]+$/g, "");   // 例：「[舊版備份] DE_行動卡」
   const tk = name.split(/[_\s-]+/).find(t => /^[A-Z]{1,5}$/.test(t)) || "";
-  return {cat, id, name, up, date, title:rest || name, ticker:tk, url:link(id)};
+  return {cat, id, name, up, size:size||0, date, title:rest || name, ticker:tk, url:link(id)};
 }).sort((a,b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
 let items = toItems(window.REPORTS);
 
@@ -173,7 +176,7 @@ function render(){
         <input type="checkbox" ${state.sel.has(r.id)?"checked":""} aria-label="選取 ${esc(r.name)}">
         <div class="t"><div class="n">${state.cat==="new" ? esc(r.date + " ") : ""}${esc(r.title)}</div>
           <div class="m"><span class="tag">${CATS[r.cat]}</span>${state.hidden.has(r.id)?`<span class="tag">已隱藏</span>`:""}${r.ticker?`<span class="tag">${r.ticker}</span>`:""}<span class="up">上傳 ${hkTime(r.up)}（HKT）</span></div></div>
-        <a class="open" href="${r.url}" target="_blank" rel="noopener">打開</a>
+        <div class="rt"><a class="open" href="${r.url}" target="_blank" rel="noopener">打開</a>${r.size?`<span class="szt">${fmtSize(r.size)}</span>`:""}</div>
       </div>`).join("") + `</div>`).join("") : `<div class="empty">搵唔到相關報告</div>`;
   updateBar();
 }
@@ -354,7 +357,7 @@ $("#upfile").onchange = async e => {
       const j = await r.json().catch(() => ({}));
       if(r.status === 401){ lock(); throw new Error("密碼錯誤，已退出管理"); }
       if(!r.ok) throw new Error(j.error || r.status);
-      items = toItems(items.map(x => [x.cat, x.id, x.name, x.up]).concat([j.row]));
+      items = toItems(items.map(x => [x.cat, x.id, x.name, x.up, x.size]).concat([j.row]));
       ok++; updTotal(); render();
     } catch(err){ fail.push(f.name + "：" + err.message); }
   }
