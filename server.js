@@ -228,6 +228,15 @@ async function driveBuffer(id) {
   return buf;
 }
 function saveSig() { const tmp = SIG_FILE + ".tmp"; fs.writeFileSync(tmp, JSON.stringify(sig)); fs.renameSync(tmp, SIG_FILE); }
+function allCards(rows) {   // 所有行動卡（新→舊）；同一股票同一日只取最新上傳
+  const seen = new Map();
+  for (const r of rows.filter(x => x[0] === "card")) {
+    const date = nameDate(r[2]), ticker = nameTicker(r[2]); if (!date || !ticker) continue;
+    const k = ticker + "|" + date, o = seen.get(k);
+    if (!o || r[3] > o.up) seen.set(k, {id: r[1], name: r[2], up: r[3], size: r[4], date, ticker});
+  }
+  return [...seen.values()].sort((a, b) => b.date.localeCompare(a.date) || b.up.localeCompare(a.up));
+}
 function latestCards(rows) {
   const by = new Map();
   for (const r of rows.filter(x => x[0] === "card")) {
@@ -242,7 +251,7 @@ async function sigIndex() {
   sigState.running = true; sigState.err = ""; sigState.done = 0;
   try {
     const rows = await sync(false);
-    const todo = latestCards(rows).flatMap(g => g.cards).filter(c => !sig.cards[c.id] && !(sig.fail[c.id] && Date.now() - sig.fail[c.id].at < 3600e3));
+    const todo = allCards(rows).filter(c => !sig.cards[c.id] && !(sig.fail[c.id] && Date.now() - sig.fail[c.id].at < 3600e3));
     sigState.pending = todo.length;
     let next = 0;
     const worker = async () => {
@@ -265,17 +274,24 @@ async function sigIndex() {
   finally { sigState.running = false; sigState.pending = 0; sigState.lastRun = Date.now(); }
 }
 function sigPayload() {
-  const rows = cache ? latestCards(cache.rows) : [];
-  const out = rows.map(g => {
-    const cur = sig.cards[g.cards[0].id], prev = g.cards[1] && sig.cards[g.cards[1].id];
-    if (!cur) return null;
-    const prevScore = cur.prevScore ?? (prev ? prev.score : undefined);
-    return {ticker: g.ticker, id: cur.id, name: cur.name, date: cur.date || cur.fileDate, up: cur.up, stars: cur.stars, rating: cur.rating, score: cur.score, prevScore,
-      market: cur.market, cap: cur.cap, headline: cur.headline, flat: cur.flat, held: cur.held, gates: cur.gates, close: cur.close, levels: cur.levels, alerts: (cur.alerts || []).slice(0, 8), cls: cur.cls};
-  }).filter(Boolean);
-  const ids = new Set(rows.map(g => g.cards[0].id));
-  return {rows: out, total: rows.length, failed: [...ids].filter(i => sig.fail[i] && !sig.cards[i]).length, pending: sigState.pending, running: sigState.running, err: sigState.err, lastRun: sigState.lastRun};
+  // 以已解析（永久保存）嘅卡為準：Drive 檔案日後被刪，歷史都仍然喺度
+  const history = signals.buildHistory(Object.values(sig.cards));
+  const rows = [], feed = [];
+  for (const [ticker, list] of Object.entries(history)) {
+    const last = list[list.length - 1], rec = sig.cards[last.id], cls = signals.classify(rec);
+    const prevScore = rec.prevScore ?? (list.length > 1 ? list[list.length - 2].score : undefined);
+    const lastTag = k => { for (let i = list.length - 1; i >= 0; i--) if (list[i].tag === k || list[i].tag === "mixed") return list[i].date; return ""; };
+    rows.push({ticker, id: rec.id, name: rec.name, date: last.date, up: rec.up, stars: rec.stars, rating: rec.rating, score: rec.score, prevScore, market: rec.market, cap: rec.cap,
+      headline: rec.headline, flat: rec.flat, held: rec.held, gates: rec.gates, close: rec.close, levels: rec.levels, alerts: (rec.alerts || []).slice(0, 8), cls,
+      lastBuy: lastTag("buy"), lastSell: lastTag("sell"), days: list.length});
+    list.forEach(e => { if (e.tag) feed.push({ticker, date: e.date, tag: e.tag, id: e.id, changes: e.changes.filter(c => c.k !== "level" && c.k !== "market").slice(0, 3)}); });
+  }
+  feed.sort((a, b) => b.date.localeCompare(a.date) || a.ticker.localeCompare(b.ticker));
+  const files = cache ? new Set(allCards(cache.rows).map(c => c.ticker)).size : rows.length;
+  const failedIds = Object.keys(sig.fail).filter(i => !sig.cards[i]).length;
+  return {rows, history, feed: feed.slice(0, 40), total: Math.max(files, rows.length), failed: failedIds, pending: sigState.pending, running: sigState.running, err: sigState.err, lastRun: sigState.lastRun};
 }
+if (KEY) { setTimeout(() => sigIndex(), 20000); setInterval(() => sigIndex(), 30 * 60 * 1000); }
 async function sigApi(req, res) {
   // 公開唯讀；「重新分析」(refresh=1) 只限管理員，避免被人不斷觸發
   const force = new URL(req.url, "http://x").searchParams.get("refresh") === "1";

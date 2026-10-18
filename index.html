@@ -76,6 +76,18 @@
   #sig .txt{font-size:13px;line-height:1.55;margin:4px 0} #sig .txt b{color:var(--mute);font-weight:600}
   #sig .lv{font-size:12.5px;color:var(--ink);margin:4px 0} #sig .lv span{white-space:nowrap;margin-right:10px}
   #sig .al{font-size:12px;color:var(--mute);margin:3px 0}
+  #sig .feed{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
+  #sig .feed h3{font-size:14px;margin:0 0 6px}
+  #sig .ev{font-size:13px;line-height:1.5;padding:5px 0;border-top:1px solid var(--line)} #sig .ev:first-of-type{border-top:0}
+  #sig .tg{display:inline-block;font-size:12px;font-weight:700;padding:1px 7px;border-radius:6px;margin-right:4px}
+  #sig .tg.buy{background:#dcfce7;color:#166534} #sig .tg.sell{background:#fee2e2;color:#991b1b} #sig .tg.mixed{background:#fef3c7;color:#92400e}
+  #sig .lastsig{font-size:12px;color:var(--mute);margin:3px 0}
+  #sig .tl{margin:6px 0 2px;border-left:2px solid var(--line);padding-left:10px}
+  #sig .tl .day{font-size:12.5px;line-height:1.55;margin:6px 0}
+  #sig .tl .day .d{font-weight:700;margin-right:6px}
+  #sig .tl .chg{color:var(--mute);margin-left:2px}
+  #sig .tl .up{color:#16a34a} #sig .tl .down{color:#dc2626}
+  #sig button.lnk{border:0;background:none;color:var(--brand);padding:2px 0;font:inherit;font-size:13px;cursor:pointer}
   #sig .ft{font-size:12px;color:var(--mute);margin:12px 0 4px;line-height:1.6}
   #sig .stale{color:#d97706;font-size:12px}
   #sig a.open{display:inline-block;margin-top:4px}
@@ -473,7 +485,7 @@ function renderCov(){
 }
 
 // ---- 買賣訊號（由行動卡自動整理）----
-const sg = {data:null, err:"", loading:false, filter:"all", timer:null};
+const sg = {data:null, err:"", loading:false, filter:"all", timer:null, open:new Set(), feedAll:false};
 async function loadSig(force){
   if(sg.loading) return; sg.loading = true; sg.err = ""; if(!sg.data) renderSig();
   try {
@@ -515,6 +527,7 @@ function renderSig(){
     (nearBuy.length ? '<div class="hl"><b>🎯 接近買入觸發（≤3%）：</b>' + nearBuy.map(r => esc(r.ticker) + ' ▲' + p2(r.levels.buy.pct) + '%').join('、') + '</div>' : '') +
     (nearStop.length ? '<div class="hl"><b>🛑 接近止損（≤3%）：</b>' + nearStop.map(r => esc(r.ticker) + ' ▼' + p2(r.levels.stop.pct) + '%').join('、') + '</div>' : '') +
     (movers.length ? '<div class="hl"><b>📈 分數變動：</b>' + movers.map(r => esc(r.ticker) + ' ' + r.prevScore + '→' + r.score).join('、') + '</div>' : '') + '</div>' +
+    feedHtml(d) +
     '<div class="bar"><button class="sm" id="sgAll">' + (sg.filter === "all" ? "✓ " : "") + '全部（' + rows.length + '）</button>' + (state.pw ? '<button class="sm" id="sgReload">🔄 重新分析</button>' : '') + '</div>' +
     (shown.map(r => {
       const c = r.cls, lv = r.levels || {}, stale = r.date < maxDate;
@@ -529,12 +542,34 @@ function renderSig(){
           (lv.buy ? '<span>🎯 觸發 ' + p2(lv.buy.price) + ' ' + (lv.buy.dir === "up" ? "▲" : "▼") + p2(lv.buy.pct) + '%</span>' : '') +
           (lv.stop ? '<span>🛑 止損 ' + p2(lv.stop.price) + ' ▼' + p2(lv.stop.pct) + '%</span>' : '') + (lv.trim ? '<span>減倉 ' + p2(lv.trim.price) + ' ▲' + p2(lv.trim.pct) + '%</span>' : '') + '</div>' +
         (al.length ? '<div class="al">最近警報：' + al.map(a => p2(a.price) + (a.dir === "up" ? " ▲" : " ▼") + p2(a.pct) + '% ' + esc(a.note.split(/[。，]/)[0])).join(' ｜ ') + '</div>' : '') +
-        '<a class="open" href="' + link0(r.id) + '" target="_blank" rel="noopener">打開行動卡 ' + r.date.slice(5) + '</a></div>';
+        ((r.lastBuy || r.lastSell) ? '<div class="lastsig">' + (r.lastBuy ? '🟢 最近買入訊號：' + r.lastBuy.slice(5) : '') + (r.lastBuy && r.lastSell ? '　' : '') + (r.lastSell ? '🔴 最近賣出訊號：' + r.lastSell.slice(5) : '') + '</div>' : '') +
+        '<a class="open" href="' + link0(r.id) + '" target="_blank" rel="noopener">打開行動卡 ' + r.date.slice(5) + '</a> ' +
+        ((d.history[r.ticker] || []).length > 1 ? '<button class="lnk" data-tl="' + esc(r.ticker) + '">' + (sg.open.has(r.ticker) ? "▲ 收起" : "📜 每日變化（" + d.history[r.ticker].length + " 日）") + '</button>' : '') +
+        (sg.open.has(r.ticker) ? timeline(d.history[r.ticker]) : '') + '</div>';
     }).join("") || '<p class="note">無符合條件嘅股票</p>') +
     '<div class="ft">訊號標籤只係按行動卡文字同三道閘結果自動歸類，唔係獨立買賣判斷，亦唔係投資建議；請以當日行動卡原文為準（盤中唔改計劃，等 alert）。目前只讀取「一頁行動卡」，未讀本體報告同核對附錄。</div>';
+  el.querySelectorAll("[data-tl]").forEach(b => b.onclick = () => { const t = b.dataset.tl; sg.open.has(t) ? sg.open.delete(t) : sg.open.add(t); renderSig(); });
+  const fm = $("#sgFeedMore"); if(fm) fm.onclick = () => { sg.feedAll = !sg.feedAll; renderSig(); };
   el.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { sg.filter = sg.filter === b.dataset.f ? "all" : b.dataset.f; renderSig(); });
   $("#sgAll").onclick = () => { sg.filter = "all"; renderSig(); };
   if($("#sgReload")) $("#sgReload").onclick = () => { sg.data = null; loadSig(true); };
+}
+
+const TAGS = {buy:["buy","🟢 買入訊號"], sell:["sell","🔴 賣出訊號"], mixed:["mixed","🟡 買賣訊號並存"]};
+function feedHtml(d){
+  const feed = d.feed || []; if(!feed.length) return '<div class="feed"><h3>🔔 最近訊號變化</h3><div class="note">暫時未有訊號轉變記錄（需要至少兩日嘅行動卡先可以比較）。</div></div>';
+  const list = sg.feedAll ? feed : feed.slice(0, 8);
+  return '<div class="feed"><h3>🔔 最近訊號變化</h3>' + list.map(e => { const t = TAGS[e.tag];
+    return '<div class="ev"><b>' + e.date.slice(5) + ' ' + esc(e.ticker) + '</b> <span class="tg ' + t[0] + '">' + t[1] + '</span>' + e.changes.map(c => '<span class="chg">' + esc(c.text) + '</span>').join('；') + '</div>'; }).join("") +
+    (feed.length > 8 ? '<button class="lnk" id="sgFeedMore">' + (sg.feedAll ? "▲ 收起" : "顯示全部 " + feed.length + " 項") + '</button>' : '') + '</div>';
+}
+function timeline(list){
+  return '<div class="tl">' + list.slice().reverse().map(e => {
+    const t = e.tag ? '<span class="tg ' + TAGS[e.tag][0] + '">' + TAGS[e.tag][1] + '</span>' : '';
+    const st = (e.stars ? "★".repeat(e.stars) + " " : "") + esc(e.rating || "") + (typeof e.score === "number" ? " · " + e.score : "") + " · 未持倉 " + esc(e.flat.label) + " · 已持倉 " + esc(e.held.label);
+    return '<div class="day"><span class="d">' + e.date.slice(5) + '</span>' + t + st +
+      (e.first ? '<div class="chg">（開始記錄）</div>' : e.changes.length ? e.changes.map(c => '<div class="chg ' + c.dir + '">' + (c.dir === "up" ? "▲ " : c.dir === "down" ? "▼ " : "• ") + esc(c.text) + '</div>').join("") : '<div class="chg">冇變化</div>') + '</div>';
+  }).join("") + '</div>';
 }
 const link0 = id => "https://drive.google.com/file/d/" + id + "/view";
 (async () => {

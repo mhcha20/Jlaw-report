@@ -99,4 +99,64 @@ function classify(c) {
   return {flat: flatSignal, held: heldSignal, gatesOpen: open, gatesFailed: failed};
 }
 
-module.exports = {pdfText, parseCard, classify};
+
+// ---- 每日變化比較 ----
+const stateLabel = c => (c.stars ? "★".repeat(c.stars) + " " : "") + (c.rating || "–");
+const fmt2 = n => typeof n === "number" ? n.toFixed(2) : n;
+// 比較同一隻股票相鄰兩日嘅行動卡，回傳訊號標籤同逐項變化
+function diffCards(p, c) {
+  const pc = p.cls || classify(p), cc = c.cls || classify(c);
+  const ch = []; let buy = false, sell = false;
+  if (p.stars !== c.stars || p.rating !== c.rating) {
+    const dir = (c.stars || 0) > (p.stars || 0) ? "up" : (c.stars || 0) < (p.stars || 0) ? "down" : "flat";
+    ch.push({k: "rating", dir, text: "評等 " + stateLabel(p) + " → " + stateLabel(c)});
+    if (c.rating === "買入" && p.rating !== "買入") buy = true;
+    if (p.rating === "買入" && c.rating !== "買入") sell = true;
+  }
+  const buyKeys = ["go", "cond"];
+  if (pc.flat.key !== cc.flat.key) {
+    ch.push({k: "flat", dir: buyKeys.includes(cc.flat.key) && !buyKeys.includes(pc.flat.key) ? "up" : !buyKeys.includes(cc.flat.key) && buyKeys.includes(pc.flat.key) ? "down" : "flat", text: "未持倉 " + pc.flat.label + " → " + cc.flat.label});
+    if (buyKeys.includes(cc.flat.key) && !buyKeys.includes(pc.flat.key)) buy = true;
+  }
+  if (pc.held.key !== cc.held.key) {
+    const bad = ["exit", "trim"];
+    ch.push({k: "held", dir: bad.includes(cc.held.key) && !bad.includes(pc.held.key) ? "down" : bad.includes(pc.held.key) && !bad.includes(cc.held.key) ? "up" : "flat", text: "已持倉 " + pc.held.label + " → " + cc.held.label});
+    if (bad.includes(cc.held.key) && !bad.includes(pc.held.key)) sell = true;
+  }
+  if (p.gates && c.gates) {
+    for (const [k, name] of [["vol", "量能閘"], ["rr", "2:1 閘"], ["atr", "1 ATR 閘"]]) {
+      if (p.gates[k] !== c.gates[k] && c.gates[k] !== null) ch.push({k: "gate", dir: c.gates[k] ? "up" : "down", text: name + " " + (p.gates[k] ? "✔" : "✘") + " → " + (c.gates[k] ? "✔" : "✘")});
+    }
+    if (cc.gatesOpen === 3 && pc.gatesOpen !== 3) buy = true;
+  }
+  if (typeof p.score === "number" && typeof c.score === "number" && p.score !== c.score)
+    ch.push({k: "score", dir: c.score > p.score ? "up" : "down", text: "分數 " + p.score + " → " + c.score + "（" + (c.score > p.score ? "▲" : "▼") + Math.abs(c.score - p.score) + "）"});
+  for (const [k, name] of [["buy", "買入觸發"], ["stop", "止損"], ["trim", "減倉"]]) {
+    const a = p.levels && p.levels[k], b = c.levels && c.levels[k];
+    if (a && b && a.price !== b.price) ch.push({k: "level", dir: b.price > a.price ? "up" : "down", text: name + " " + fmt2(a.price) + " → " + fmt2(b.price)});
+  }
+  if (p.market && c.market && p.market !== c.market) ch.push({k: "market", dir: "flat", text: "大盤 " + p.market + " → " + c.market});
+  return {tag: buy && sell ? "mixed" : buy ? "buy" : sell ? "sell" : null, changes: ch};
+}
+
+// 將所有已解析嘅卡按股票、日期整理成時間線
+function buildHistory(cards) {
+  const by = new Map();
+  for (const c of cards) {
+    const date = c.date || c.fileDate; if (!date || !c.ticker) continue;
+    const l = by.get(c.ticker) || by.set(c.ticker, new Map()).get(c.ticker);
+    const o = l.get(date); if (!o || (c.up || "") > (o.up || "")) l.set(date, c);   // 同日多份只留最新上傳
+  }
+  const out = {};
+  for (const [t, m] of by) {
+    const list = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(e => ({...e[1], date: e[0], cls: classify(e[1])}));
+    out[t] = list.map((c, i) => {
+      const d = i ? diffCards(list[i - 1], c) : {tag: null, changes: []};
+      return {date: c.date, id: c.id, stars: c.stars, rating: c.rating, score: c.score, flat: c.cls.flat, held: c.cls.held, gates: c.gates,
+        buy: c.levels && c.levels.buy ? c.levels.buy.price : null, stop: c.levels && c.levels.stop ? c.levels.stop.price : null, market: c.market, first: i === 0, tag: d.tag, changes: d.changes};
+    });
+  }
+  return out;
+}
+
+module.exports = {pdfText, parseCard, classify, diffCards, buildHistory};
