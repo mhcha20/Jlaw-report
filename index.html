@@ -252,7 +252,7 @@ function message(){
 }
 function updateBar(){
   const n = state.sel.size;
-  $("#bar").classList.toggle("show", n>0);
+  $("#bar").classList.toggle("show", n>0 && state.cat!=="cov" && state.cat!=="sig");
   $("#cnt").textContent = "已選 " + n + " 份";
   const adm = !!state.pw;
   $("#hide").style.display = adm ? "inline-block" : "none"; $("#del").style.display = adm && state.canDelete ? "inline-block" : "none";

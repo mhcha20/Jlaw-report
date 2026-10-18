@@ -32,7 +32,7 @@ function parseCard(raw) {
   const sAl = between(t, /(?:警報\s*要升／跌幾多|5\s*三個警報價)/, /7\s*(?:明日|今日更正)/);
 
   // 評等同分數
-  const rate = s1.match(/(★{1,5})\s*(買入|觀察|持有|減持|賣出|迴避|中立)/) || t.match(/(★{1,5})\s*(買入|觀察|持有|減持|賣出|迴避|中立)/);
+  const rate = s1.match(/(★{1,5})\s*((?:強烈)?買入|觀察|持有|減持|賣出|迴避|中立)/) || t.match(/(★{1,5})\s*((?:強烈)?買入|觀察|持有|減持|賣出|迴避|中立)/);
   if (rate) { r.stars = rate[1].length; r.rating = rate[2]; }
   const sc = s1.match(/(\d{1,3})\s*[／/]\s*100/) || t.match(/(\d{1,3})\s*[／/]\s*100/);
   if (sc) r.score = num(sc[1]);
@@ -75,6 +75,10 @@ function parseCard(raw) {
     const a2 = /[$＄]?([\d,]+(?:\.\d+)?)\s*[｜|]\s*(.*?)（要([升跌])\s*([\d.]+)%）/g;
     while ((m = a2.exec(sAl))) alerts.push({price: num(m[1]), dir: m[3] === "升" ? "up" : "down", pct: num(m[4]), note: trim(m[2], 48)});
   }
+  if (!alerts.length) {
+    const a3 = /(?:^|\s)[$＄]?([\d,]+\.\d{1,3})\s+(?:[▲▼]\s*([\d.]+)%|現價\s+[\d.]+%|要([升跌])\s*[\d.]+%)\s*([^\d]*?)(?=\s[$＄]?[\d,]+\.\d{1,3}\s+(?:[▲▼]|現價|要)|$)/g;
+    while ((m = a3.exec(sAl))) if (m[2]) alerts.push({price: num(m[1]), dir: /▲/.test(m[0]) ? "up" : "down", pct: num(m[2]), note: trim(m[4], 48)});
+  }
   r.alerts = alerts;
   return r;
 }
@@ -82,7 +86,7 @@ function parseCard(raw) {
 // 按卡內文字歸類（機械規則，唔係判斷）
 function classify(c) {
   const flat = c.flat || "", held = c.held || "", gates = c.gates;
-  const noNew = /唔開新倉|零新倉|不開新倉|不建倉|唔建倉|不新增|唔買|不買|空倉觀望|不入場|唔入場/.test(flat);
+  const noNew = /唔開新倉|零新倉|不開新倉|不建倉|唔建倉|不新增|唔買|不買|空倉觀望|零倉|保持觀望|嚴禁盲目|不入場|唔入場/.test(flat);
   const wantBuy = /低吸|吸納|分批|建倉|買入|入場|開倉|加碼/.test(flat);
   const open = gates ? Object.values(gates).filter(v => v === true).length : null;
   const failed = gates ? Object.entries(gates).filter(([, v]) => v === false).map(([k]) => ({vol: "量能閘", rr: "2:1閘", atr: "1 ATR閘"}[k])) : [];
@@ -94,7 +98,7 @@ function classify(c) {
   let heldSignal;
   if (/全數離場|清倉|全部止損|立即離場|今日離場/.test(held)) heldSignal = {key: "exit", label: "離場"};
   else if (/減磅|減倉|減半|減持/.test(held)) heldSignal = {key: "trim", label: "減倉"};
-  else if (/續抱|持有|守穩|堅守|嚴守/.test(held)) heldSignal = {key: "hold", label: "續抱"};
+  else if (/續抱|持有|守穩|堅守|嚴守|享受主升|^持\s*[\/／]|持倉/.test(held)) heldSignal = {key: "hold", label: "續抱"};
   else heldSignal = {key: "alert", label: "按警報"};
   return {flat: flatSignal, held: heldSignal, gatesOpen: open, gatesFailed: failed};
 }
@@ -104,14 +108,15 @@ function classify(c) {
 const stateLabel = c => (c.stars ? "★".repeat(c.stars) + " " : "") + (c.rating || "–");
 const fmt2 = n => typeof n === "number" ? n.toFixed(2) : n;
 // 比較同一隻股票相鄰兩日嘅行動卡，回傳訊號標籤同逐項變化
+const isBuy = c => /買入$/.test(c.rating || "");
 function diffCards(p, c) {
   const pc = p.cls || classify(p), cc = c.cls || classify(c);
   const ch = []; let buy = false, sell = false;
   if (p.stars !== c.stars || p.rating !== c.rating) {
     const dir = (c.stars || 0) > (p.stars || 0) ? "up" : (c.stars || 0) < (p.stars || 0) ? "down" : "flat";
     ch.push({k: "rating", dir, text: "評等 " + stateLabel(p) + " → " + stateLabel(c)});
-    if (c.rating === "買入" && p.rating !== "買入") buy = true;
-    if (p.rating === "買入" && c.rating !== "買入") sell = true;
+    if (isBuy(c) && !isBuy(p)) buy = true;
+    if (isBuy(p) && !isBuy(c)) sell = true;
   }
   const buyKeys = ["go", "cond"];
   if (pc.flat.key !== cc.flat.key) {
