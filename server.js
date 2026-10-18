@@ -277,9 +277,12 @@ function sigPayload() {
   return {rows: out, total: rows.length, failed: [...ids].filter(i => sig.fail[i] && !sig.cards[i]).length, pending: sigState.pending, running: sigState.running, err: sigState.err, lastRun: sigState.lastRun};
 }
 async function sigApi(req, res) {
-  if (!ADMIN) return json(res, 503, {error: "未設定 ADMIN_PASSWORD"});
-  const a = authed(req); if (a !== 200) return json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"});
+  // 公開唯讀；「重新分析」(refresh=1) 只限管理員，避免被人不斷觸發
   const force = new URL(req.url, "http://x").searchParams.get("refresh") === "1";
+  if (force) {
+    if (!ADMIN) return json(res, 503, {error: "未設定 ADMIN_PASSWORD"});
+    const a = authed(req); if (a !== 200) return json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"});
+  }
   if (!sigState.running && (force || Date.now() - sigState.lastRun > 60000)) { await Promise.race([sigIndex(), new Promise(r => setTimeout(r, 4000))]); }
   json(res, 200, sigPayload());
 }

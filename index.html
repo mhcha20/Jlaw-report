@@ -174,7 +174,7 @@ function btns(el, entries, key){
   entries.forEach(([v,label]) => {
     const b = document.createElement("button");
     b.textContent = label; if(state[key]===v) b.className = "on";
-    b.onclick = async () => { if((v === "cov" || v === "sig") && !state.pw){ await doUnlock(); if(!state.pw) return; } state[key]=v; render(); if(v === "cov") loadSheet(false); if(v === "sig") loadSig(false); };
+    b.onclick = async () => { if(v === "cov" && !state.pw){ await doUnlock(); if(!state.pw) return; } state[key]=v; render(); if(v === "cov") loadSheet(false); if(v === "sig") loadSig(false); };
     el.appendChild(b);
   });
 }
@@ -309,7 +309,7 @@ async function api(path, payload){
   return {ok:r.ok, status:r.status, j};
 }
 function applyVis(j){ state.hidden = new Set(j.hidden||[]); state.deleted = new Set(j.deleted||[]); [...state.sel].forEach(i => { if(state.deleted.has(i)) state.sel.delete(i); }); updTotal(); persist(); render(); }
-function lock(){ if(state.cat === "cov" || state.cat === "sig") state.cat = "all"; state.pw = ""; try{ sessionStorage.removeItem("jlaw-pw"); }catch(e){} state.showHidden = false; $("#showHidCb").checked = false; adminUi(); render(); }
+function lock(){ if(state.cat === "cov") state.cat = "all"; state.pw = ""; try{ sessionStorage.removeItem("jlaw-pw"); }catch(e){} state.showHidden = false; $("#showHidCb").checked = false; adminUi(); render(); }
 function adminUi(){
   const on = !!state.pw;
   $("#adm").textContent = on ? "🔓 管理中（退出）" : "🔒 管理"; $("#adm").classList.toggle("on", on);
@@ -515,7 +515,7 @@ function renderSig(){
     (nearBuy.length ? '<div class="hl"><b>🎯 接近買入觸發（≤3%）：</b>' + nearBuy.map(r => esc(r.ticker) + ' ▲' + p2(r.levels.buy.pct) + '%').join('、') + '</div>' : '') +
     (nearStop.length ? '<div class="hl"><b>🛑 接近止損（≤3%）：</b>' + nearStop.map(r => esc(r.ticker) + ' ▼' + p2(r.levels.stop.pct) + '%').join('、') + '</div>' : '') +
     (movers.length ? '<div class="hl"><b>📈 分數變動：</b>' + movers.map(r => esc(r.ticker) + ' ' + r.prevScore + '→' + r.score).join('、') + '</div>' : '') + '</div>' +
-    '<div class="bar"><button class="sm" id="sgAll">' + (sg.filter === "all" ? "✓ " : "") + '全部（' + rows.length + '）</button><button class="sm" id="sgReload">🔄 重新分析</button></div>' +
+    '<div class="bar"><button class="sm" id="sgAll">' + (sg.filter === "all" ? "✓ " : "") + '全部（' + rows.length + '）</button>' + (state.pw ? '<button class="sm" id="sgReload">🔄 重新分析</button>' : '') + '</div>' +
     (shown.map(r => {
       const c = r.cls, lv = r.levels || {}, stale = r.date < maxDate;
       const al = (r.alerts || []).filter(a => typeof a.pct === "number").sort((a,b) => a.pct - b.pct).slice(0, 2);
@@ -534,7 +534,7 @@ function renderSig(){
     '<div class="ft">訊號標籤只係按行動卡文字同三道閘結果自動歸類，唔係獨立買賣判斷，亦唔係投資建議；請以當日行動卡原文為準（盤中唔改計劃，等 alert）。目前只讀取「一頁行動卡」，未讀本體報告同核對附錄。</div>';
   el.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { sg.filter = sg.filter === b.dataset.f ? "all" : b.dataset.f; renderSig(); });
   $("#sgAll").onclick = () => { sg.filter = "all"; renderSig(); };
-  $("#sgReload").onclick = () => { sg.data = null; loadSig(true); };
+  if($("#sgReload")) $("#sgReload").onclick = () => { sg.data = null; loadSig(true); };
 }
 const link0 = id => "https://drive.google.com/file/d/" + id + "/view";
 (async () => {

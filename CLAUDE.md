@@ -16,7 +16,7 @@
 
 ## 買賣訊號（📊 分頁）
 - `signals.js`：用 `pdfjs-dist` 讀「一頁行動卡」PDF 文字，抽取評等／分數／三道閘／今日動作（未持倉、已持倉）／三條價位／警報；`classify()` 按卡內文字機械歸類（零新倉、條件式建倉、三閘全過、觀望；續抱、減倉、離場），**唔係獨立買賣判斷**。
-- `server.js`：`GET /api/signals`（需密碼）背景處理每隻股票最新 2 份行動卡，結果存 `/data/signals.json`；已處理過嘅卡唔會重讀。網頁喺分析期間每 3 秒輪詢。
+- `server.js`：`GET /api/signals`（**公開唯讀**；`?refresh=1` 重新分析需密碼）背景處理每隻股票最新 2 份行動卡，結果存 `/data/signals.json`；已處理過嘅卡唔會重讀。網頁喺分析期間每 3 秒輪詢。
 - 行動卡版面變更時要更新 `signals.js` 嘅解析規則（以 `2 今日動作`、`3 三條價位` 等格標題切段）。真實卡文字屬內部資料，測試用文本放 scratchpad，唔好提交入 repo。
 - 未有讀取：個股本體報告、核對附錄。
 
@@ -24,7 +24,7 @@
 - 報告檔名：`YYYY-MM-DD_TICKER_類型.pdf`；程式亦兼容 `TICKER-report-YYYY-MM-DD-繁體版`、`TICKER_JLaw_MYT_…_YYYYMMDD` 等格式，日期同股票代號由檔名解析。類型主要由 Drive 資料夾決定。
 - 只提交 `server.js`、`index.html`、`data.js`、`package.json`、`docs/`、`CLAUDE.md`。測試用檔案放 scratchpad，唔好入 repo。
 - 改動前端後，先用 Playwright（`/opt/pw-browsers/chromium`）以 390px 手機闊度測試。
-- 管理功能（上傳／隱藏／刪除／覆蓋檢查）需 `ADMIN_PASSWORD`；Drive 刪除需用戶 Google 授權（service account 唔可以刪用戶個人 Drive 嘅檔案）。
+- 管理功能（上傳／隱藏／刪除／覆蓋檢查／重新分析訊號）需 `ADMIN_PASSWORD`（買賣訊號頁本身公開）；Drive 刪除需用戶 Google 授權（service account 唔可以刪用戶個人 Drive 嘅檔案）。
 
 ## 參考資料
 - `docs/open-card.md`：**開盤睇盤流程卡 V1.0**（點樣用每日三份報告：行動卡／本體報告／核對附錄、盤前三分鐘盤中零閱讀收市後十分鐘、三道閘、常見錯誤）。原檔 `docs/open-card-V1.0-PANW-2026-10-06.pdf`。用戶會就呢份資料跟進，處理相關問題前請先讀。
