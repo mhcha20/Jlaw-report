@@ -246,6 +246,31 @@ function latestCards(rows) {
   }
   return [...by.entries()].map(([t, l]) => ({ticker: t, cards: l.sort((a, b) => b.date.localeCompare(a.date) || b.up.localeCompare(a.up)).slice(0, 2)}));
 }
+// ---- 行情（開市價／收市價）：用嚟模擬「訊號後下一個交易日開市價成交」----
+const priceLib = require("./prices.js");
+const PX_FILE = path.join(DATA_DIR, "prices.json");
+let px = {t: {}};
+try { px = {t: {}, ...JSON.parse(fs.readFileSync(PX_FILE, "utf8"))}; } catch (e) {}
+const pxState = {running: false};
+function savePx() { const tmp = PX_FILE + ".tmp"; fs.writeFileSync(tmp, JSON.stringify(px)); fs.renameSync(tmp, PX_FILE); }
+async function pxRefresh() {
+  if (pxState.running) return;
+  pxState.running = true;
+  try {
+    const tickers = [...new Set(Object.values(sig.cards).map(c => c.ticker).filter(Boolean))];
+    for (const t of tickers) {
+      const e = px.t[t];
+      if (e && Date.now() - e.at < 3 * 3600e3) continue;
+      try { const r = await priceLib.fetchBars(t); px.t[t] = {at: Date.now(), src: r.src, rows: r.rows.map(b => [b.d, b.o, b.c])}; }
+      catch (err) { console.error("price fetch failed", t, err.message); px.t[t] = {rows: [], ...(e || {}), at: Date.now() - 150 * 60e3, err: err.message}; }   // 失敗 30 分鐘後再試
+      await new Promise(r => setTimeout(r, 300));
+    }
+    savePx();
+  } catch (e) { console.error("pxRefresh failed", e.message); }
+  finally { pxState.running = false; }
+}
+const barsOf = t => ((px.t[t] && px.t[t].rows) || []).map(r => ({d: r[0], o: r[1], c: r[2]}));
+
 async function sigIndex() {
   if (sigState.running) return;
   sigState.running = true; sigState.err = ""; sigState.done = 0;
@@ -271,7 +296,7 @@ async function sigIndex() {
     await Promise.all([worker(), worker(), worker()]);
     saveSig();
   } catch (e) { sigState.err = e.code === 503 ? "未設定 DRIVE_API_KEY" : e.message; console.error("signal index failed", e.message); }
-  finally { sigState.running = false; sigState.pending = 0; sigState.lastRun = Date.now(); }
+  finally { sigState.running = false; sigState.pending = 0; sigState.lastRun = Date.now(); pxRefresh(); }
 }
 function sigPayload() {
   // 以已解析（永久保存）嘅卡為準：Drive 檔案日後被刪，歷史都仍然喺度
@@ -290,8 +315,10 @@ function sigPayload() {
   const files = cache ? new Set(allCards(cache.rows).map(c => c.ticker)).size : rows.length;
   const failedIds = Object.keys(sig.fail).filter(i => !sig.cards[i]).length;
   const bt = {};
-  for (const [t, l] of Object.entries(history)) bt[t] = signals.backtest(l);
-  return {rows, history, bt, feed: feed.slice(0, 40), total: Math.max(files, rows.length), failed: failedIds, pending: sigState.pending, running: sigState.running, err: sigState.err, lastRun: sigState.lastRun};
+  for (const [t, l] of Object.entries(history)) bt[t] = signals.backtest(l, barsOf(t));
+  return {rows, history, bt, feed: feed.slice(0, 40), total: Math.max(files, rows.length), failed: failedIds, pending: sigState.pending, running: sigState.running, err: sigState.err, lastRun: sigState.lastRun,
+    px: {have: Object.values(px.t).filter(e => e.rows && e.rows.length).length, failed: Object.values(px.t).filter(e => !(e.rows && e.rows.length)).length,
+      src: [...new Set(Object.values(px.t).map(e => e.src).filter(Boolean))].join("/"), lastErr: (Object.values(px.t).find(e => e.err && !(e.rows && e.rows.length)) || {}).err || ""}};
 }
 if (KEY) { setTimeout(() => sigIndex(), 20000); setInterval(() => sigIndex(), 30 * 60 * 1000); }
 async function sigApi(req, res) {
@@ -300,6 +327,7 @@ async function sigApi(req, res) {
   if (force) {
     if (!ADMIN) return json(res, 503, {error: "未設定 ADMIN_PASSWORD"});
     const a = authed(req); if (a !== 200) return json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"});
+    Object.values(px.t).forEach(e => { e.at = 0; });
   }
   if (!sigState.running && (force || Date.now() - sigState.lastRun > 60000)) { await Promise.race([sigIndex(), new Promise(r => setTimeout(r, 4000))]); }
   json(res, 200, sigPayload());

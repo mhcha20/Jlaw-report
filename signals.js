@@ -160,33 +160,40 @@ function buildHistory(cards) {
 }
 
 
-// ---- 模擬回測：每隻股票起始 $100，買入訊號當日收市價買入、賣出訊號當日收市價賣出，所得滾存 ----
-// 規則：只計卡內「收市價」；唔計手續費、滑點；可買碎股；買賣訊號當日收市價成交（實際上訊號喺收市後先知，所以屬理想化假設）。
-function backtest(list, start = 100) {
-  let cash = start, shares = 0, pos = null, skipped = 0;
-  const trades = [];
+// ---- 模擬回測：每隻股票起始 $100，訊號出咗之後「下一個交易日開市價」成交，所得滾存 ----
+// 訊號喺卡嘅日期收市後先出：買入訊號 → 下一個交易日開市價買入；賣出訊號 → 下一個交易日開市價全數賣出。
+// prices：[{d:'YYYY-MM-DD', o, c}]（升序）。唔計手續費、滑點；可買碎股。
+function backtest(list, prices = [], start = 100) {
+  const P = prices.filter(b => b && typeof b.o === "number").sort((a, b) => a.d.localeCompare(b.d));
+  const nextBar = d => P.find(b => b.d > d);
+  const lastBar = P[P.length - 1];
+  // 1) 由訊號產生訂單（按卡內標籤；同日買賣並存：持倉當賣、未持倉唔買）
+  const orders = []; let st = "flat";
   for (const e of list) {
-    const px = typeof e.close === "number" ? e.close : null;
-    const buyEv = (e.tag === "buy") || (e.first && e.flat && (e.flat.key === "go" || e.flat.key === "cond"));
+    const buyEv = e.tag === "buy" || (e.first && e.flat && (e.flat.key === "go" || e.flat.key === "cond"));
     const sellEv = e.tag === "sell" || e.tag === "mixed";
-    if (!pos && buyEv) {
-      if (px === null) { skipped++; continue; }
-      shares = cash / px;
-      pos = {date: e.date, price: px, why: e.first ? "起始日已係買入狀態" : (e.changes.find(c => c.dir === "up") || e.changes[0] || {text: "買入訊號"}).text};
-    } else if (pos && sellEv) {
-      if (px === null) { skipped++; continue; }
-      cash = shares * px;
-      trades.push({entry: pos.date, entryPx: pos.price, exit: e.date, exitPx: px, ret: px / pos.price - 1, whyIn: pos.why, whyOut: (e.changes.find(c => c.dir === "down") || e.changes[0] || {text: "賣出訊號"}).text});
-      shares = 0; pos = null;
-    }
+    if (st === "flat" && buyEv && e.tag !== "mixed") { orders.push({side: "buy", signalDate: e.date, why: e.first ? "起始日已係買入狀態" : (e.changes.find(c => c.dir === "up") || e.changes[0] || {text: "買入訊號"}).text}); st = "long"; }
+    else if (st === "long" && sellEv) { orders.push({side: "sell", signalDate: e.date, why: (e.changes.find(c => c.dir === "down") || e.changes[0] || {text: "賣出訊號"}).text}); st = "flat"; }
   }
-  const priced = list.filter(e => typeof e.close === "number");
-  const last = priced[priced.length - 1], first = priced[0];
-  const open = pos && last ? {date: pos.date, price: pos.price, now: last.close, nowDate: last.date, ret: last.close / pos.price - 1, why: pos.why} : null;
-  const final = pos && last ? shares * last.close : cash;
+  // 2) 逐張訂單按下一個交易日開市價成交
+  let cash = start, shares = 0, buy = null;
+  const trades = [], pending = []; let noData = 0;
+  for (const o of orders) {
+    const bar = nextBar(o.signalDate);
+    if (!bar) { if (P.length) pending.push({side: o.side, signalDate: o.signalDate, why: o.why}); else noData++; continue; }
+    const fill = {signalDate: o.signalDate, fillDate: bar.d, price: bar.o, why: o.why};
+    if (o.side === "buy") { shares = cash / bar.o; buy = fill; }
+    else if (buy) { cash = shares * bar.o; trades.push({buy, sell: fill, ret: bar.o / buy.price - 1}); shares = 0; buy = null; }
+  }
+  const holding = !!buy;
+  const now = lastBar ? lastBar.c : null;
+  const open = holding && now != null ? {...buy, now, nowDate: lastBar.d, ret: now / buy.price - 1} : null;
+  const final = holding && now != null ? shares * now : cash;
   const wins = trades.filter(t => t.ret > 0).length;
-  return {final, ret: final / start - 1, trades, open, wins, losses: trades.length - wins, skipped, days: list.length,
-    traded: trades.length > 0 || !!pos, bh: first && last && first !== last ? last.close / first.close - 1 : null, from: first ? first.date : "", to: last ? last.date : ""};
+  const firstFill = list.length && nextBar(list[0].date);
+  return {final, ret: final / start - 1, trades, open, pending, noData, wins, losses: trades.length - wins, days: list.length,
+    traded: trades.length > 0 || holding, hasPrices: P.length > 0,
+    bh: firstFill && lastBar && lastBar.d > firstFill.d ? lastBar.c / firstFill.o - 1 : null, from: list.length ? list[0].date : "", to: lastBar ? lastBar.d : ""};
 }
 
 module.exports = {pdfText, parseCard, classify, diffCards, buildHistory, backtest};
