@@ -289,7 +289,9 @@ function sigPayload() {
   feed.sort((a, b) => b.date.localeCompare(a.date) || a.ticker.localeCompare(b.ticker));
   const files = cache ? new Set(allCards(cache.rows).map(c => c.ticker)).size : rows.length;
   const failedIds = Object.keys(sig.fail).filter(i => !sig.cards[i]).length;
-  return {rows, history, feed: feed.slice(0, 40), total: Math.max(files, rows.length), failed: failedIds, pending: sigState.pending, running: sigState.running, err: sigState.err, lastRun: sigState.lastRun};
+  const bt = {};
+  for (const [t, l] of Object.entries(history)) bt[t] = signals.backtest(l);
+  return {rows, history, bt, feed: feed.slice(0, 40), total: Math.max(files, rows.length), failed: failedIds, pending: sigState.pending, running: sigState.running, err: sigState.err, lastRun: sigState.lastRun};
 }
 if (KEY) { setTimeout(() => sigIndex(), 20000); setInterval(() => sigIndex(), 30 * 60 * 1000); }
 async function sigApi(req, res) {

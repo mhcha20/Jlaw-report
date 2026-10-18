@@ -88,6 +88,13 @@
   #sig .tl .chg{color:var(--mute);margin-left:2px}
   #sig .tl .up{color:#16a34a} #sig .tl .down{color:#dc2626}
   #sig button.lnk{border:0;background:none;color:var(--brand);padding:2px 0;font:inherit;font-size:13px;cursor:pointer}
+  #sig .vt{display:flex;gap:8px;margin:8px 0} #sig .vt button{flex:1;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px;font:inherit;font-weight:600;cursor:pointer}
+  #sig .vt button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  #sig .pos{color:#16a34a} #sig .neg{color:#dc2626}
+  #sig .btr{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;cursor:pointer}
+  #sig .btr .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  #sig .btr .big{font-size:16px;font-weight:700} #sig .btr .sub{font-size:12px;color:var(--mute);margin-top:3px;line-height:1.5}
+  #sig .btr .tr{font-size:12.5px;line-height:1.55;margin-top:6px;padding-top:6px;border-top:1px dashed var(--line)}
   #sig .ft{font-size:12px;color:var(--mute);margin:12px 0 4px;line-height:1.6}
   #sig .stale{color:#d97706;font-size:12px}
   #sig a.open{display:inline-block;margin-top:4px}
@@ -485,7 +492,7 @@ function renderCov(){
 }
 
 // ---- 買賣訊號（由行動卡自動整理）----
-const sg = {data:null, err:"", loading:false, filter:"all", timer:null, open:new Set(), feedAll:false};
+const sg = {view:"list", btSort:"ret", btOpen:new Set(), data:null, err:"", loading:false, filter:"all", timer:null, open:new Set(), feedAll:false};
 async function loadSig(force){
   if(sg.loading) return; sg.loading = true; sg.err = ""; if(!sg.data) renderSig();
   try {
@@ -505,6 +512,12 @@ function renderSig(){
   if(sg.err){ el.innerHTML = '<p class="note">⚠ ' + esc(sg.err) + '</p><button class="sm" id="sgRetry">重試</button>'; $("#sgRetry").onclick = () => loadSig(true); return; }
   if(!sg.data){ el.innerHTML = '<p class="note">讀取中…</p>'; return; }
   const d = sg.data, rows = d.rows.filter(r => r.cls);
+  const vt = '<div class="vt"><button data-v="list" class="' + (sg.view === "list" ? "on" : "") + '">📋 訊號</button><button data-v="bt" class="' + (sg.view === "bt" ? "on" : "") + '">💰 回測 $100</button></div>';
+  if(sg.view === "bt"){ el.innerHTML = vt + btHtml(d);
+    el.querySelectorAll("[data-v]").forEach(b => b.onclick = () => { sg.view = b.dataset.v; renderSig(); });
+    el.querySelectorAll("[data-bs]").forEach(b => b.onclick = () => { sg.btSort = b.dataset.bs; renderSig(); });
+    el.querySelectorAll("[data-bt]").forEach(b => b.onclick = () => { const t = b.dataset.bt; sg.btOpen.has(t) ? sg.btOpen.delete(t) : sg.btOpen.add(t); renderSig(); });
+    return; }
   const maxDate = rows.reduce((m, r) => r.date > m ? r.date : m, "");
   const latest = rows.filter(r => r.date === maxDate);
   const cnt = k => rows.filter(r => r.cls.flat.key === k).length;
@@ -520,7 +533,7 @@ function renderSig(){
   const gate = (v, label) => v === null || v === undefined ? "" : '<span class="' + (v ? "ok" : "no") + '">' + (v ? "✔" : "✘") + label + '</span> ';
   const dlt = r => typeof r.prevScore === "number" ? (r.score > r.prevScore ? ' <span class="ok">▲' + (r.score - r.prevScore) + '</span>' : r.score < r.prevScore ? ' <span class="no">▼' + (r.prevScore - r.score) + '</span>' : ' <span class="mut">持平</span>') : "";
   const stat = (k, cls, lab) => '<div class="st ' + cls + (sg.filter === k ? " on" : "") + '" data-f="' + k + '"><b>' + cnt(k) + '</b><span>' + lab + '</span></div>';
-  el.innerHTML =
+  el.innerHTML = vt +
     '<div class="sum"><div class="hd"><span class="dt">' + (maxDate || "–") + ' 訊號</span><span class="mut">' + rows.length + ' / ' + d.total + ' 隻已讀取' + (d.pending ? '（分析中，仲有 ' + d.pending + ' 份…）' : '') + (d.failed ? '（' + d.failed + ' 份讀取失敗）' : '') + '</span></div>' +
     '<div class="stats">' + stat("go","g","🟢 三閘全過") + stat("cond","y","🟡 條件式") + stat("wait","w","⚪ 觀望") + stat("none","r","🔴 零新倉") + '</div>' +
     '<div class="hl">' + (mkt ? '<b>大盤：</b>' + esc(mkt[0]) + (cap ? '，倉位上限 ' + esc(cap) : '') + '　' : '') + '<b>平均分：</b>' + avg + '　<b>持倉提示：</b>減倉／離場 ' + holdAct.length + ' 隻</div>' +
@@ -542,12 +555,14 @@ function renderSig(){
           (lv.buy ? '<span>🎯 觸發 ' + p2(lv.buy.price) + ' ' + (lv.buy.dir === "up" ? "▲" : "▼") + p2(lv.buy.pct) + '%</span>' : '') +
           (lv.stop ? '<span>🛑 止損 ' + p2(lv.stop.price) + ' ▼' + p2(lv.stop.pct) + '%</span>' : '') + (lv.trim ? '<span>減倉 ' + p2(lv.trim.price) + ' ▲' + p2(lv.trim.pct) + '%</span>' : '') + '</div>' +
         (al.length ? '<div class="al">最近警報：' + al.map(a => p2(a.price) + (a.dir === "up" ? " ▲" : " ▼") + p2(a.pct) + '% ' + esc(a.note.split(/[。，]/)[0])).join(' ｜ ') + '</div>' : '') +
+        (d.bt && d.bt[r.ticker] && d.bt[r.ticker].traded ? '<div class="lastsig">💰 模擬 $100 → $' + d.bt[r.ticker].final.toFixed(2) + '（<span class="' + (d.bt[r.ticker].ret >= 0 ? "pos" : "neg") + '">' + pc(d.bt[r.ticker].ret) + '</span>）</div>' : '') +
         ((r.lastBuy || r.lastSell) ? '<div class="lastsig">' + (r.lastBuy ? '🟢 最近買入訊號：' + r.lastBuy.slice(5) : '') + (r.lastBuy && r.lastSell ? '　' : '') + (r.lastSell ? '🔴 最近賣出訊號：' + r.lastSell.slice(5) : '') + '</div>' : '') +
         '<a class="open" href="' + link0(r.id) + '" target="_blank" rel="noopener">打開行動卡 ' + r.date.slice(5) + '</a> ' +
         ((d.history[r.ticker] || []).length > 1 ? '<button class="lnk" data-tl="' + esc(r.ticker) + '">' + (sg.open.has(r.ticker) ? "▲ 收起" : "📜 每日變化（" + d.history[r.ticker].length + " 日）") + '</button>' : '') +
         (sg.open.has(r.ticker) ? timeline(d.history[r.ticker]) : '') + '</div>';
     }).join("") || '<p class="note">無符合條件嘅股票</p>') +
     '<div class="ft">訊號標籤只係按行動卡文字同三道閘結果自動歸類，唔係獨立買賣判斷，亦唔係投資建議；請以當日行動卡原文為準（盤中唔改計劃，等 alert）。目前只讀取「一頁行動卡」，未讀本體報告同核對附錄。</div>';
+  el.querySelectorAll("[data-v]").forEach(b => b.onclick = () => { sg.view = b.dataset.v; renderSig(); });
   el.querySelectorAll("[data-tl]").forEach(b => b.onclick = () => { const t = b.dataset.tl; sg.open.has(t) ? sg.open.delete(t) : sg.open.add(t); renderSig(); });
   const fm = $("#sgFeedMore"); if(fm) fm.onclick = () => { sg.feedAll = !sg.feedAll; renderSig(); };
   el.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { sg.filter = sg.filter === b.dataset.f ? "all" : b.dataset.f; renderSig(); });
@@ -566,10 +581,38 @@ function feedHtml(d){
 function timeline(list){
   return '<div class="tl">' + list.slice().reverse().map(e => {
     const t = e.tag ? '<span class="tg ' + TAGS[e.tag][0] + '">' + TAGS[e.tag][1] + '</span>' : '';
-    const st = (e.stars ? "★".repeat(e.stars) + " " : "") + esc(e.rating || "") + (typeof e.score === "number" ? " · " + e.score : "") + " · 未持倉 " + esc(e.flat.label) + " · 已持倉 " + esc(e.held.label);
+    const st = (e.stars ? "★".repeat(e.stars) + " " : "") + esc(e.rating || "") + (typeof e.score === "number" ? " · " + e.score : "") + (typeof e.close === "number" ? " · 收市 " + p2(e.close) : "") + " · 未持倉 " + esc(e.flat.label) + " · 已持倉 " + esc(e.held.label);
     return '<div class="day"><span class="d">' + e.date.slice(5) + '</span>' + t + st +
       (e.first ? '<div class="chg">（開始記錄）</div>' : e.changes.length ? e.changes.map(c => '<div class="chg ' + c.dir + '">' + (c.dir === "up" ? "▲ " : c.dir === "down" ? "▼ " : "• ") + esc(c.text) + '</div>').join("") : '<div class="chg">冇變化</div>') + '</div>';
   }).join("") + '</div>';
+}
+
+const pc = x => (x >= 0 ? "+" : "") + (x * 100).toFixed(2) + "%";
+function btHtml(d){
+  const bt = d.bt || {}, all = Object.entries(bt).map(([t, r]) => ({t, ...r}));
+  if(!all.length) return '<p class="note">未有足夠資料做回測。</p>';
+  const N = all.length, inv = 100 * N, fin = all.reduce((s, r) => s + r.final, 0);
+  const win = all.filter(r => r.ret > 0.00005).length, lose = all.filter(r => r.ret < -0.00005).length, none = all.filter(r => !r.traded).length;
+  const closed = all.flatMap(r => r.trades), cw = closed.filter(t => t.ret > 0).length;
+  const bhs = all.filter(r => r.bh !== null), bhAvg = bhs.length ? bhs.reduce((s, r) => s + r.bh, 0) / bhs.length : null;
+  const from = all.map(r => r.from).filter(Boolean).sort()[0] || "", to = all.map(r => r.to).filter(Boolean).sort().pop() || "";
+  const sorted = all.slice().sort((a, b) => sg.btSort === "ret" ? b.ret - a.ret : sg.btSort === "low" ? a.ret - b.ret : a.t.localeCompare(b.t));
+  const sb = (k, l) => '<button class="sm' + (sg.btSort === k ? " on" : "") + '" data-bs="' + k + '">' + l + '</button>';
+  return '<div class="sum"><div class="hd"><span class="dt">每隻 $100 模擬</span><span class="mut">' + from.slice(5) + ' → ' + to.slice(5) + ' · ' + N + ' 隻</span></div>' +
+    '<div class="stats"><div class="st ' + (fin >= inv ? "g" : "r") + '"><b>' + pc(fin / inv - 1) + '</b><span>總報酬</span></div><div class="st g"><b>' + win + '</b><span>賺錢</span></div><div class="st r"><b>' + lose + '</b><span>蝕錢</span></div><div class="st w"><b>' + none + '</b><span>未入場</span></div></div>' +
+    '<div class="hl"><b>總投入：</b>$' + inv.toFixed(0) + ' → <b>$' + fin.toFixed(2) + '</b>　<b>已平倉交易：</b>' + closed.length + ' 次（勝 ' + cw + ' 負 ' + (closed.length - cw) + '）' +
+    (bhAvg !== null ? '　<b>同期一直持有（平均）：</b>' + pc(bhAvg) : '') + '</div></div>' +
+    '<div class="bar">' + sb("ret", "報酬高→低") + sb("low", "報酬低→高") + sb("az", "A–Z") + '</div>' +
+    sorted.map(r => {
+      const open = sg.btOpen.has(r.t);
+      const status = r.open ? '持倉中（買入 ' + r.open.date.slice(5) + ' @' + p2(r.open.price) + '，最新 ' + p2(r.open.now) + ' ' + pc(r.open.ret) + '）' : r.traded ? '已平倉' : '未入場（未有買入訊號）';
+      const trs = r.trades.map(t => '<div>' + t.entry.slice(5) + ' 買 ' + p2(t.entryPx) + ' → ' + t.exit.slice(5) + ' 賣 ' + p2(t.exitPx) + '　<b class="' + (t.ret >= 0 ? "pos" : "neg") + '">' + pc(t.ret) + '</b><div class="sub">買：' + esc(t.whyIn) + '　賣：' + esc(t.whyOut) + '</div></div>').join("") +
+        (r.open ? '<div>' + r.open.date.slice(5) + ' 買 ' + p2(r.open.price) + ' → 持倉中　<b class="' + (r.open.ret >= 0 ? "pos" : "neg") + '">' + pc(r.open.ret) + '</b><div class="sub">買：' + esc(r.open.why) + '</div></div>' : '');
+      return '<div class="btr" data-bt="' + esc(r.t) + '"><div class="top"><span class="big">' + esc(r.t) + '</span><span class="big ' + (r.ret >= 0.00005 ? "pos" : r.ret <= -0.00005 ? "neg" : "") + '">$' + r.final.toFixed(2) + '（' + pc(r.ret) + '）</span></div>' +
+        '<div class="sub">' + r.trades.length + ' 次平倉（勝 ' + r.wins + ' 負 ' + r.losses + '）· ' + status + (r.bh !== null ? ' · 一直持有 ' + pc(r.bh) : '') + (r.skipped ? ' · ⚠ ' + r.skipped + ' 日缺收市價' : '') + '</div>' +
+        (open ? '<div class="tr">' + (trs || '<span class="mut">未有交易</span>') + '</div>' : (trs ? '<div class="sub">點擊睇交易明細 ▾</div>' : '')) + '</div>';
+    }).join("") +
+    '<div class="ft"><b>模擬假設：</b>每隻股票起始 $100；出現「買入訊號」當日收市價買入（起始日已係買入狀態亦當日入），出現「賣出訊號」當日收市價全數賣出，所得複利滾存；可買碎股，唔計手續費、滑點同稅；同日買賣訊號並存時，持倉當賣出、未持倉唔買。<br><b>留意：</b>訊號係收市後先出，用同日收市價成交屬理想化假設（實際只可次日入），結果會偏樂觀；而且只有約 ' + Math.max(...all.map(r => r.days)) + ' 日數據，樣本好少，過去表現唔代表將來，唔係投資建議。</div>';
 }
 const link0 = id => "https://drive.google.com/file/d/" + id + "/view";
 (async () => {

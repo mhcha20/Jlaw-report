@@ -153,10 +153,40 @@ function buildHistory(cards) {
     out[t] = list.map((c, i) => {
       const d = i ? diffCards(list[i - 1], c) : {tag: null, changes: []};
       return {date: c.date, id: c.id, stars: c.stars, rating: c.rating, score: c.score, flat: c.cls.flat, held: c.cls.held, gates: c.gates,
-        buy: c.levels && c.levels.buy ? c.levels.buy.price : null, stop: c.levels && c.levels.stop ? c.levels.stop.price : null, market: c.market, first: i === 0, tag: d.tag, changes: d.changes};
+        close: typeof c.close === "number" ? c.close : null, buy: c.levels && c.levels.buy ? c.levels.buy.price : null, stop: c.levels && c.levels.stop ? c.levels.stop.price : null, market: c.market, first: i === 0, tag: d.tag, changes: d.changes};
     });
   }
   return out;
 }
 
-module.exports = {pdfText, parseCard, classify, diffCards, buildHistory};
+
+// ---- 模擬回測：每隻股票起始 $100，買入訊號當日收市價買入、賣出訊號當日收市價賣出，所得滾存 ----
+// 規則：只計卡內「收市價」；唔計手續費、滑點；可買碎股；買賣訊號當日收市價成交（實際上訊號喺收市後先知，所以屬理想化假設）。
+function backtest(list, start = 100) {
+  let cash = start, shares = 0, pos = null, skipped = 0;
+  const trades = [];
+  for (const e of list) {
+    const px = typeof e.close === "number" ? e.close : null;
+    const buyEv = (e.tag === "buy") || (e.first && e.flat && (e.flat.key === "go" || e.flat.key === "cond"));
+    const sellEv = e.tag === "sell" || e.tag === "mixed";
+    if (!pos && buyEv) {
+      if (px === null) { skipped++; continue; }
+      shares = cash / px;
+      pos = {date: e.date, price: px, why: e.first ? "起始日已係買入狀態" : (e.changes.find(c => c.dir === "up") || e.changes[0] || {text: "買入訊號"}).text};
+    } else if (pos && sellEv) {
+      if (px === null) { skipped++; continue; }
+      cash = shares * px;
+      trades.push({entry: pos.date, entryPx: pos.price, exit: e.date, exitPx: px, ret: px / pos.price - 1, whyIn: pos.why, whyOut: (e.changes.find(c => c.dir === "down") || e.changes[0] || {text: "賣出訊號"}).text});
+      shares = 0; pos = null;
+    }
+  }
+  const priced = list.filter(e => typeof e.close === "number");
+  const last = priced[priced.length - 1], first = priced[0];
+  const open = pos && last ? {date: pos.date, price: pos.price, now: last.close, nowDate: last.date, ret: last.close / pos.price - 1, why: pos.why} : null;
+  const final = pos && last ? shares * last.close : cash;
+  const wins = trades.filter(t => t.ret > 0).length;
+  return {final, ret: final / start - 1, trades, open, wins, losses: trades.length - wins, skipped, days: list.length,
+    traded: trades.length > 0 || !!pos, bh: first && last && first !== last ? last.close / first.close - 1 : null, from: first ? first.date : "", to: last ? last.date : ""};
+}
+
+module.exports = {pdfText, parseCard, classify, diffCards, buildHistory, backtest};
