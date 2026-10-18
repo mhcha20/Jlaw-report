@@ -54,6 +54,31 @@
   #hide{background:var(--line);color:var(--ink)}
   #del{background:#dc2626;color:#fff}
   .item.hid{opacity:.55}
+  #sig .sum{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0}
+  #sig .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+  #sig .dt{font-size:17px;font-weight:700} #sig .mut{font-size:12px;color:var(--mute)}
+  #sig .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  #sig .st{border:1px solid var(--line);border-radius:10px;padding:8px 2px;text-align:center;background:var(--bg);cursor:pointer}
+  #sig .st b{display:block;font-size:22px;line-height:1.1} #sig .st span{display:block;font-size:11px;color:var(--mute);margin-top:2px}
+  #sig .st.on{outline:2px solid var(--brand)}
+  #sig .g b{color:#16a34a} #sig .y b{color:#d97706} #sig .w b{color:var(--mute)} #sig .r b{color:#dc2626}
+  #sig .hl{font-size:13px;margin:6px 0;line-height:1.7} #sig .hl b{margin-right:4px}
+  #sig .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+  #sig button.sm{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 9px;font:inherit}
+  #sig .card{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
+  #sig .card.go{border-left-color:#16a34a} #sig .card.cond{border-left-color:#d97706} #sig .card.wait{border-left-color:var(--mute)} #sig .card.none{border-left-color:#dc2626}
+  #sig .l1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  #sig .tk{font-size:17px;font-weight:700} #sig .rt2{font-size:13px;color:var(--mute)}
+  #sig .chip{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line);margin:2px 4px 2px 0;white-space:nowrap}
+  #sig .chip.go{background:#16a34a;color:#fff;border-color:#16a34a} #sig .chip.cond{background:#fef3c7;color:#92400e;border-color:#fcd34d}
+  #sig .chip.none{background:#fee2e2;color:#991b1b;border-color:#fca5a5} #sig .chip.wait{color:var(--mute)}
+  #sig .ok{color:#16a34a} #sig .no{color:#dc2626}
+  #sig .txt{font-size:13px;line-height:1.55;margin:4px 0} #sig .txt b{color:var(--mute);font-weight:600}
+  #sig .lv{font-size:12.5px;color:var(--ink);margin:4px 0} #sig .lv span{white-space:nowrap;margin-right:10px}
+  #sig .al{font-size:12px;color:var(--mute);margin:3px 0}
+  #sig .ft{font-size:12px;color:var(--mute);margin:12px 0 4px;line-height:1.6}
+  #sig .stale{color:#d97706;font-size:12px}
+  #sig a.open{display:inline-block;margin-top:4px}
   #cov h3{font-size:15px;margin:14px 0 6px}
   #cov .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
   #cov select,#cov input[type=date],#cov button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 9px;font:inherit}
@@ -96,6 +121,7 @@
   </div>
   <div id="list"></div>
   <div id="cov" style="display:none"></div>
+  <div id="sig" style="display:none"></div>
 </div>
 
 <div id="bar"><div class="in">
@@ -148,17 +174,18 @@ function btns(el, entries, key){
   entries.forEach(([v,label]) => {
     const b = document.createElement("button");
     b.textContent = label; if(state[key]===v) b.className = "on";
-    b.onclick = async () => { if(v === "cov" && !state.pw){ await doUnlock(); if(!state.pw) return; } state[key]=v; render(); if(v === "cov") loadSheet(false); };
+    b.onclick = async () => { if((v === "cov" || v === "sig") && !state.pw){ await doUnlock(); if(!state.pw) return; } state[key]=v; render(); if(v === "cov") loadSheet(false); if(v === "sig") loadSig(false); };
     el.appendChild(b);
   });
 }
 function esc(s){ return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 function render(){
-  btns($("#tabs"), [["all","全部"], ["new","🆕 最新上傳"], ["cov","✅ 覆蓋檢查"], ...Object.entries(CATS)], "cat");
-  const isCov = state.cat === "cov";
-  $("#cov").style.display = isCov ? "" : "none"; $("#list").style.display = isCov ? "none" : ""; document.querySelector(".tools").style.display = isCov ? "none" : "";
-  if(isCov){ $("#chips").style.display = "none"; renderCov(); updateBar(); return; }
+  btns($("#tabs"), [["all","全部"], ["new","🆕 最新上傳"], ["cov","✅ 覆蓋檢查"], ["sig","📊 買賣訊號"], ...Object.entries(CATS)], "cat");
+  const isCov = state.cat === "cov", isSig = state.cat === "sig";
+  $("#cov").style.display = isCov ? "" : "none"; $("#sig").style.display = isSig ? "" : "none";
+  $("#list").style.display = (isCov || isSig) ? "none" : ""; document.querySelector(".tools").style.display = (isCov || isSig) ? "none" : "";
+  if(isCov || isSig){ $("#chips").style.display = "none"; isCov ? renderCov() : renderSig(); updateBar(); return; }
   const tickers = [...new Set(items.filter(r => !state.deleted.has(r.id) && (state.showHidden || !state.hidden.has(r.id)) && (state.cat==="all" || state.cat==="new" || r.cat===state.cat)).map(r=>r.ticker).filter(Boolean))].sort();
   if(state.ticker!=="all" && !tickers.includes(state.ticker)) state.ticker="all";
   btns($("#chips"), [["all","所有股票"], ...tickers.map(t=>[t,t])], "ticker");
@@ -282,7 +309,7 @@ async function api(path, payload){
   return {ok:r.ok, status:r.status, j};
 }
 function applyVis(j){ state.hidden = new Set(j.hidden||[]); state.deleted = new Set(j.deleted||[]); [...state.sel].forEach(i => { if(state.deleted.has(i)) state.sel.delete(i); }); updTotal(); persist(); render(); }
-function lock(){ if(state.cat === "cov") state.cat = "all"; state.pw = ""; try{ sessionStorage.removeItem("jlaw-pw"); }catch(e){} state.showHidden = false; $("#showHidCb").checked = false; adminUi(); render(); }
+function lock(){ if(state.cat === "cov" || state.cat === "sig") state.cat = "all"; state.pw = ""; try{ sessionStorage.removeItem("jlaw-pw"); }catch(e){} state.showHidden = false; $("#showHidCb").checked = false; adminUi(); render(); }
 function adminUi(){
   const on = !!state.pw;
   $("#adm").textContent = on ? "🔓 管理中（退出）" : "🔒 管理"; $("#adm").classList.toggle("on", on);
@@ -444,6 +471,72 @@ function renderCov(){
   $("#covCopy").onclick = async () => { try{ await navigator.clipboard.writeText(text); toast("已複製"); }catch(e){ toast("複製失敗"); } };
   $("#covWa").onclick = () => window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
 }
+
+// ---- 買賣訊號（由行動卡自動整理）----
+const sg = {data:null, err:"", loading:false, filter:"all", timer:null};
+async function loadSig(force){
+  if(sg.loading) return; sg.loading = true; sg.err = ""; if(!sg.data) renderSig();
+  try {
+    const r = await fetch("/api/signals" + (force ? "?refresh=1" : ""), {headers:{"x-admin-password":state.pw}}); const j = await r.json().catch(() => ({}));
+    if(r.status === 401){ lock(); throw new Error("密碼錯誤，已退出管理"); }
+    if(!r.ok) throw new Error(j.error || r.status);
+    sg.data = j;
+  } catch(e){ sg.err = e.message; }
+  sg.loading = false; renderSig();
+  clearTimeout(sg.timer);
+  if(state.cat === "sig" && sg.data && (sg.data.pending > 0 || sg.data.running)) sg.timer = setTimeout(() => loadSig(false), 3000);
+}
+const SIGORD = {go:0, cond:1, wait:2, none:3};
+const p2 = n => typeof n === "number" ? n.toFixed(2) : n;
+function renderSig(){
+  const el = $("#sig"); if(state.cat !== "sig") return;
+  if(sg.err){ el.innerHTML = '<p class="note">⚠ ' + esc(sg.err) + '</p><button class="sm" id="sgRetry">重試</button>'; $("#sgRetry").onclick = () => loadSig(true); return; }
+  if(!sg.data){ el.innerHTML = '<p class="note">讀取中…</p>'; return; }
+  const d = sg.data, rows = d.rows.filter(r => r.cls);
+  const maxDate = rows.reduce((m, r) => r.date > m ? r.date : m, "");
+  const latest = rows.filter(r => r.date === maxDate);
+  const cnt = k => rows.filter(r => r.cls.flat.key === k).length;
+  const mkt = (() => { const c = {}; latest.forEach(r => { if(r.market) c[r.market] = (c[r.market]||0) + 1; }); return Object.entries(c).sort((a,b) => b[1]-a[1])[0]; })();
+  const cap = latest.map(r => r.cap).find(Boolean);
+  const scores = rows.filter(r => typeof r.score === "number");
+  const avg = scores.length ? (scores.reduce((s, r) => s + r.score, 0) / scores.length).toFixed(0) : "–";
+  const nearBuy = rows.filter(r => r.levels && r.levels.buy && r.levels.buy.dir === "up" && r.levels.buy.pct <= 3).sort((a,b) => a.levels.buy.pct - b.levels.buy.pct).slice(0, 6);
+  const nearStop = rows.filter(r => r.levels && r.levels.stop && r.levels.stop.pct <= 3).sort((a,b) => a.levels.stop.pct - b.levels.stop.pct).slice(0, 6);
+  const movers = rows.filter(r => typeof r.score === "number" && typeof r.prevScore === "number" && r.score !== r.prevScore).sort((a,b) => Math.abs(b.score-b.prevScore) - Math.abs(a.score-a.prevScore)).slice(0, 5);
+  const holdAct = rows.filter(r => r.cls.held.key === "exit" || r.cls.held.key === "trim");
+  const shown = rows.filter(r => sg.filter === "all" || r.cls.flat.key === sg.filter).sort((a,b) => SIGORD[a.cls.flat.key] - SIGORD[b.cls.flat.key] || (b.score||0) - (a.score||0));
+  const gate = (v, label) => v === null || v === undefined ? "" : '<span class="' + (v ? "ok" : "no") + '">' + (v ? "✔" : "✘") + label + '</span> ';
+  const dlt = r => typeof r.prevScore === "number" ? (r.score > r.prevScore ? ' <span class="ok">▲' + (r.score - r.prevScore) + '</span>' : r.score < r.prevScore ? ' <span class="no">▼' + (r.prevScore - r.score) + '</span>' : ' <span class="mut">持平</span>') : "";
+  const stat = (k, cls, lab) => '<div class="st ' + cls + (sg.filter === k ? " on" : "") + '" data-f="' + k + '"><b>' + cnt(k) + '</b><span>' + lab + '</span></div>';
+  el.innerHTML =
+    '<div class="sum"><div class="hd"><span class="dt">' + (maxDate || "–") + ' 訊號</span><span class="mut">' + rows.length + ' / ' + d.total + ' 隻已讀取' + (d.pending ? '（分析中，仲有 ' + d.pending + ' 份…）' : '') + (d.failed ? '（' + d.failed + ' 份讀取失敗）' : '') + '</span></div>' +
+    '<div class="stats">' + stat("go","g","🟢 三閘全過") + stat("cond","y","🟡 條件式") + stat("wait","w","⚪ 觀望") + stat("none","r","🔴 零新倉") + '</div>' +
+    '<div class="hl">' + (mkt ? '<b>大盤：</b>' + esc(mkt[0]) + (cap ? '，倉位上限 ' + esc(cap) : '') + '　' : '') + '<b>平均分：</b>' + avg + '　<b>持倉提示：</b>減倉／離場 ' + holdAct.length + ' 隻</div>' +
+    (nearBuy.length ? '<div class="hl"><b>🎯 接近買入觸發（≤3%）：</b>' + nearBuy.map(r => esc(r.ticker) + ' ▲' + p2(r.levels.buy.pct) + '%').join('、') + '</div>' : '') +
+    (nearStop.length ? '<div class="hl"><b>🛑 接近止損（≤3%）：</b>' + nearStop.map(r => esc(r.ticker) + ' ▼' + p2(r.levels.stop.pct) + '%').join('、') + '</div>' : '') +
+    (movers.length ? '<div class="hl"><b>📈 分數變動：</b>' + movers.map(r => esc(r.ticker) + ' ' + r.prevScore + '→' + r.score).join('、') + '</div>' : '') + '</div>' +
+    '<div class="bar"><button class="sm" id="sgAll">' + (sg.filter === "all" ? "✓ " : "") + '全部（' + rows.length + '）</button><button class="sm" id="sgReload">🔄 重新分析</button></div>' +
+    (shown.map(r => {
+      const c = r.cls, lv = r.levels || {}, stale = r.date < maxDate;
+      const al = (r.alerts || []).filter(a => typeof a.pct === "number").sort((a,b) => a.pct - b.pct).slice(0, 2);
+      return '<div class="card ' + c.flat.key + '"><div class="l1"><span class="tk">' + esc(r.ticker) + '</span><span class="rt2">' + (r.stars ? "★".repeat(r.stars) + " " : "") + esc(r.rating || "") + (typeof r.score === "number" ? ' · ' + r.score + dlt(r) : "") + '</span></div>' +
+        '<div><span class="chip ' + c.flat.key + '">未持倉：' + c.flat.label + '</span><span class="chip">已持倉：' + c.held.label + '</span>' +
+        (r.gates ? '<span class="rt2">' + gate(r.gates.vol, "量能") + gate(r.gates.rr, "2:1") + gate(r.gates.atr, "ATR") + '</span>' : '') +
+        (stale ? '<span class="stale"> ⏳ ' + r.date.slice(5) + '（較舊）</span>' : '') + '</div>' +
+        (r.headline ? '<div class="txt"><b>摘要</b> ' + esc(r.headline) + '</div>' : '') +
+        (r.flat ? '<div class="txt"><b>未持倉</b> ' + esc(r.flat) + '</div>' : '') + (r.held ? '<div class="txt"><b>已持倉</b> ' + esc(r.held) + '</div>' : '') +
+        '<div class="lv">' + (typeof r.close === "number" ? '<span>收市 ' + p2(r.close) + '</span>' : '') +
+          (lv.buy ? '<span>🎯 觸發 ' + p2(lv.buy.price) + ' ' + (lv.buy.dir === "up" ? "▲" : "▼") + p2(lv.buy.pct) + '%</span>' : '') +
+          (lv.stop ? '<span>🛑 止損 ' + p2(lv.stop.price) + ' ▼' + p2(lv.stop.pct) + '%</span>' : '') + (lv.trim ? '<span>減倉 ' + p2(lv.trim.price) + ' ▲' + p2(lv.trim.pct) + '%</span>' : '') + '</div>' +
+        (al.length ? '<div class="al">最近警報：' + al.map(a => p2(a.price) + (a.dir === "up" ? " ▲" : " ▼") + p2(a.pct) + '% ' + esc(a.note.split(/[。，]/)[0])).join(' ｜ ') + '</div>' : '') +
+        '<a class="open" href="' + link0(r.id) + '" target="_blank" rel="noopener">打開行動卡 ' + r.date.slice(5) + '</a></div>';
+    }).join("") || '<p class="note">無符合條件嘅股票</p>') +
+    '<div class="ft">訊號標籤只係按行動卡文字同三道閘結果自動歸類，唔係獨立買賣判斷，亦唔係投資建議；請以當日行動卡原文為準（盤中唔改計劃，等 alert）。目前只讀取「一頁行動卡」，未讀本體報告同核對附錄。</div>';
+  el.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { sg.filter = sg.filter === b.dataset.f ? "all" : b.dataset.f; renderSig(); });
+  $("#sgAll").onclick = () => { sg.filter = "all"; renderSig(); };
+  $("#sgReload").onclick = () => { sg.data = null; loadSig(true); };
+}
+const link0 = id => "https://drive.google.com/file/d/" + id + "/view";
 (async () => {
   try {
     const j = await (await fetch("/api/hidden")).json();

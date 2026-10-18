@@ -213,6 +213,77 @@ async function sheetCsv(req, res) {
   json(res, 200, {csv: sheetCache.csv, at: sheetCache.at});
 }
 
+// ---- 買賣訊號：由「行動卡」PDF 自動抽取（背景處理，結果存 /data/signals.json）----
+const signals = require("./signals.js");
+const SIG_FILE = path.join(DATA_DIR, "signals.json");
+let sig = {cards: {}, fail: {}};
+try { sig = {cards: {}, fail: {}, ...JSON.parse(fs.readFileSync(SIG_FILE, "utf8"))}; } catch (e) {}
+const sigState = {running: false, pending: 0, done: 0, err: "", lastRun: 0};
+const nameDate = n => { const m = n.match(/\d{4}-\d{2}-\d{2}/) || n.match(/(?<!\d)20\d{6}(?!\d)/); return m ? (m[0].includes("-") ? m[0] : m[0].replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3")) : ""; };
+const nameTicker = n => n.split(/[_\s\-()\[\]]+/).find(t => /^[A-Z]{1,5}$/.test(t)) || "";
+async function driveBuffer(id) {
+  const r = await fetch(`https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download&confirm=t`);
+  const buf = Buffer.from(await r.arrayBuffer());
+  if (!r.ok || buf.slice(0, 4).toString() !== "%PDF") throw new Error("drive " + r.status);
+  return buf;
+}
+function saveSig() { const tmp = SIG_FILE + ".tmp"; fs.writeFileSync(tmp, JSON.stringify(sig)); fs.renameSync(tmp, SIG_FILE); }
+function latestCards(rows) {
+  const by = new Map();
+  for (const r of rows.filter(x => x[0] === "card")) {
+    const date = nameDate(r[2]), ticker = nameTicker(r[2]);
+    if (!date || !ticker) continue;
+    (by.get(ticker) || by.set(ticker, []).get(ticker)).push({id: r[1], name: r[2], up: r[3], size: r[4], date, ticker});
+  }
+  return [...by.entries()].map(([t, l]) => ({ticker: t, cards: l.sort((a, b) => b.date.localeCompare(a.date) || b.up.localeCompare(a.up)).slice(0, 2)}));
+}
+async function sigIndex() {
+  if (sigState.running) return;
+  sigState.running = true; sigState.err = ""; sigState.done = 0;
+  try {
+    const rows = await sync(false);
+    const todo = latestCards(rows).flatMap(g => g.cards).filter(c => !sig.cards[c.id] && !(sig.fail[c.id] && Date.now() - sig.fail[c.id].at < 3600e3));
+    sigState.pending = todo.length;
+    let next = 0;
+    const worker = async () => {
+      while (next < todo.length) {
+        const c = todo[next++];
+        try {
+          const text = await signals.pdfText(await driveBuffer(c.id));
+          const p = signals.parseCard(text);
+          if (!p.date && !p.rating) throw new Error("讀唔到行動卡內容");
+          sig.cards[c.id] = {id: c.id, name: c.name, ticker: c.ticker, fileDate: c.date, up: c.up, size: c.size, ...p, cls: signals.classify(p), at: Date.now()};
+          delete sig.fail[c.id];
+        } catch (e) { console.error("signal parse failed", c.name, e.message); sig.fail[c.id] = {at: Date.now(), error: e.message}; }
+        sigState.done++; sigState.pending = todo.length - sigState.done;
+        if (sigState.done % 5 === 0) saveSig();
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    saveSig();
+  } catch (e) { sigState.err = e.code === 503 ? "未設定 DRIVE_API_KEY" : e.message; console.error("signal index failed", e.message); }
+  finally { sigState.running = false; sigState.pending = 0; sigState.lastRun = Date.now(); }
+}
+function sigPayload() {
+  const rows = cache ? latestCards(cache.rows) : [];
+  const out = rows.map(g => {
+    const cur = sig.cards[g.cards[0].id], prev = g.cards[1] && sig.cards[g.cards[1].id];
+    if (!cur) return null;
+    const prevScore = cur.prevScore ?? (prev ? prev.score : undefined);
+    return {ticker: g.ticker, id: cur.id, name: cur.name, date: cur.date || cur.fileDate, up: cur.up, stars: cur.stars, rating: cur.rating, score: cur.score, prevScore,
+      market: cur.market, cap: cur.cap, headline: cur.headline, flat: cur.flat, held: cur.held, gates: cur.gates, close: cur.close, levels: cur.levels, alerts: (cur.alerts || []).slice(0, 8), cls: cur.cls};
+  }).filter(Boolean);
+  const ids = new Set(rows.map(g => g.cards[0].id));
+  return {rows: out, total: rows.length, failed: [...ids].filter(i => sig.fail[i] && !sig.cards[i]).length, pending: sigState.pending, running: sigState.running, err: sigState.err, lastRun: sigState.lastRun};
+}
+async function sigApi(req, res) {
+  if (!ADMIN) return json(res, 503, {error: "未設定 ADMIN_PASSWORD"});
+  const a = authed(req); if (a !== 200) return json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"});
+  const force = new URL(req.url, "http://x").searchParams.get("refresh") === "1";
+  if (!sigState.running && (force || Date.now() - sigState.lastRun > 60000)) { await Promise.race([sigIndex(), new Promise(r => setTimeout(r, 4000))]); }
+  json(res, 200, sigPayload());
+}
+
 async function admin(req, res, p) {
   if (p === "/api/hidden" && req.method === "GET") return json(res, 200, {...visJson(), adminEnabled: !!ADMIN, canDelete: googleConnected() || !!process.env.GOOGLE_SA_JSON, canUpload: googleConnected(), googleReady: !!(G_ID && G_SECRET), googleConnected: googleConnected()});
   if (req.method !== "POST") return json(res, 405, {error: "method"});
@@ -246,6 +317,7 @@ http.createServer(async (req, res) => {
     const a = authed(req); if (a !== 200) return json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"});
     return upload(req, res, url).catch(e => { console.error("upload failed", e.message); json(res, 500, {error: e.message}); });
   }
+  if (p === "/api/signals" && req.method === "GET") return sigApi(req, res).catch(e => { console.error("signals failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/sheet" && req.method === "GET") return sheetCsv(req, res).catch(e => { console.error("sheet failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/oauth/url" || p === "/oauth/callback") return oauth(req, res, p, url).catch(e => { console.error("oauth failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/hidden" || p === "/api/auth" || p === "/api/hide" || p === "/api/delete") return admin(req, res, p).catch(e => { console.error("admin failed", e.message); json(res, 500, {error: e.message}); });

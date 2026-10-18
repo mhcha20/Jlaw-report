@@ -14,6 +14,12 @@
 - 環境變數（只記名稱，值喺 Railway）：`DRIVE_API_KEY`、`ADMIN_PASSWORD`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`GOOGLE_SA_JSON`（已不再需要）、`SHEET_ID`（選填）。Google OAuth redirect URI：`https://jlaw-report-a74806.up.railway.app/oauth/callback`。
 - **唔好提交任何密碼、金鑰、token。** repo 係公開嘅。
 
+## 買賣訊號（📊 分頁）
+- `signals.js`：用 `pdfjs-dist` 讀「一頁行動卡」PDF 文字，抽取評等／分數／三道閘／今日動作（未持倉、已持倉）／三條價位／警報；`classify()` 按卡內文字機械歸類（零新倉、條件式建倉、三閘全過、觀望；續抱、減倉、離場），**唔係獨立買賣判斷**。
+- `server.js`：`GET /api/signals`（需密碼）背景處理每隻股票最新 2 份行動卡，結果存 `/data/signals.json`；已處理過嘅卡唔會重讀。網頁喺分析期間每 3 秒輪詢。
+- 行動卡版面變更時要更新 `signals.js` 嘅解析規則（以 `2 今日動作`、`3 三條價位` 等格標題切段）。真實卡文字屬內部資料，測試用文本放 scratchpad，唔好提交入 repo。
+- 未有讀取：個股本體報告、核對附錄。
+
 ## 約定
 - 報告檔名：`YYYY-MM-DD_TICKER_類型.pdf`；程式亦兼容 `TICKER-report-YYYY-MM-DD-繁體版`、`TICKER_JLaw_MYT_…_YYYYMMDD` 等格式，日期同股票代號由檔名解析。類型主要由 Drive 資料夾決定。
 - 只提交 `server.js`、`index.html`、`data.js`、`package.json`、`docs/`、`CLAUDE.md`。測試用檔案放 scratchpad，唔好入 repo。
