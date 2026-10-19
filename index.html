@@ -124,7 +124,7 @@
 <body>
 <header>
   <h1>JLaw 報告中心</h1>
-  <p>共 <span id="total"></span> 份報告 · <span id="stk"></span> · 撳標題打開 PDF · 剔選後可直接 WhatsApp 分享 ·
+  <p>共 <span id="total"></span> 份報告 · <a id="stk" href="#" style="color:inherit;text-decoration:underline dotted"></a> · 撳標題打開 PDF · 剔選後可直接 WhatsApp 分享 ·
     <a id="f1" target="_blank" rel="noopener">Drive 資料夾 1</a> / <a id="f2" target="_blank" rel="noopener">2</a>
     · <button id="sync" type="button">🔄 同步 Drive</button> <span id="syncAt"></span>
     · <button id="adm" type="button">🔒 管理</button><label id="showHid"><input type="checkbox" id="showHidCb"> 顯示已隱藏</label>
@@ -133,6 +133,7 @@
     <button id="up" type="button">⬆ 上傳報告</button><input type="file" id="upfile" accept="application/pdf,.pdf" multiple hidden></p>
 </header>
 <div class="wrap">
+  <div id="stkList" style="display:none;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;font-size:14px;line-height:1.7"></div>
   <div class="tabs" id="tabs"></div>
   <div class="tabs" id="mkts"></div>
   <div class="chips" id="chips"></div>
@@ -190,6 +191,16 @@ const updTotal = () => {
   const n = Object.values(by).reduce((a, b) => a + b, 0);
   $("#stk").textContent = n + " 隻股票（" + MKTS.slice(1).filter(([k]) => by[k]).map(([k, l]) => l.split(" ")[0] + by[k]).join(" ") + "）";   // 有報告嘅股票數，按市場
 };
+function stkPanel(){   // 撳標題股票數：列出每個市場所有股票代號同報告份數；已載入 Sheet 清單嘅話，唔喺清單嘅標 🔸
+  const cnt = {}; shown().forEach(r => { if(r.ticker) cnt[r.ticker] = (cnt[r.ticker] || 0) + 1; });
+  const inSheet = typeof cov !== "undefined" && cov.sheet && cov.sheet.length ? new Set(cov.sheet.map(x => tkKey(x.ticker))) : null;
+  const html = MKTS.slice(1).map(([k, l]) => {
+    const ts = Object.keys(cnt).filter(t => mktOf(t) === k).sort(); if(!ts.length) return "";
+    return "<div><b>" + l + " " + ts.length + "</b>　" + ts.map(t => (inSheet && !inSheet.has(tkKey(t)) ? "🔸" : "") + esc(t) + "<small>(" + cnt[t] + ")</small>").join("、") + "</div>";
+  }).join("");
+  return html + '<div class="note" style="font-size:12px;opacity:.7">括號＝報告份數' + (inSheet ? "；🔸＝不在 Google Sheet 清單" : "；入「覆蓋檢查」讀取表格後，會標出不在清單嘅股票") + '</div>';
+}
+$("#stk").onclick = e => { e.preventDefault(); const el = $("#stkList"); if(el.style.display === "none"){ el.innerHTML = stkPanel(); el.style.display = ""; } else el.style.display = "none"; };
 updTotal();
 $("#f1").href = window.FOLDERS[0]; $("#f2").href = window.FOLDERS[1];
 
