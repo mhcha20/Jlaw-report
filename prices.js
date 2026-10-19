@@ -29,11 +29,13 @@ function symbols(t) {
 }
 async function fetchBars(ticker) {
   const errs = [], sym = symbols(ticker);
-  try {
-    const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym.yahoo)}?range=6mo&interval=1d&includePrePost=false`, {headers: UA});
-    if (!r.ok) throw new Error("yahoo " + r.status);
-    const p = parseYahoo(await r.json()); if (p) return {rows: p, src: "yahoo"}; errs.push("yahoo empty");
-  } catch (e) { errs.push(e.message); }
+  for (const host of ["query1", "query2"]) {   // query1 失敗就試 query2
+    try {
+      const r = await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym.yahoo)}?range=6mo&interval=1d&includePrePost=false`, {headers: UA});
+      if (!r.ok) throw new Error(`yahoo(${host}) ${sym.yahoo} ${r.status}`);
+      const p = parseYahoo(await r.json()); if (p) return {rows: p, src: "yahoo"}; errs.push(`yahoo ${sym.yahoo} empty`); break;
+    } catch (e) { errs.push(e.message); }
+  }
   if (sym.stooq) try {
     const r = await fetch(`https://stooq.com/q/d/l/?s=${encodeURIComponent(sym.stooq)}&i=d`, {headers: UA});
     if (!r.ok) throw new Error("stooq " + r.status);

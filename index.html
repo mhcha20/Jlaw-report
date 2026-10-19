@@ -628,7 +628,7 @@ function btHtml(d){
     '<div class="bar">' + sb("ret", "報酬高→低") + sb("low", "報酬低→高") + sb("az", "A–Z") + '</div>' +
     sorted.map(r => {
       const open = sg.btOpen.has(r.t);
-      const status = !r.hasPrices ? '⚠ 未攞到行情，計唔到成交' : r.open ? '持倉中（最新收市 ' + p2(r.open.now) + '，' + r.open.nowDate.slice(5) + '）' : r.traded ? '已平倉' : (r.pending || []).length ? '⏳ 訊號待成交' : '未入場（未有買入訊號）';
+      const status = !r.hasPrices ? '⚠ 未攞到行情，計唔到成交' + (r.pxErr ? '（' + esc(r.pxErr) + '）' : '') : r.open ? '持倉中（最新收市 ' + p2(r.open.now) + '，' + r.open.nowDate.slice(5) + '）' : r.traded ? '已平倉' : (r.pending || []).length ? '⏳ 訊號待成交' : '未入場（未有買入訊號）';
       const trs = r.trades.map(t => '<div>' + buyTxt(t.buy) + '<br>' + sellTxt(t.sell) + '　<b class="' + (t.ret >= 0 ? "pos" : "neg") + '">' + pc(t.ret) + '</b><div class="sub">買因：' + esc(t.buy.why) + '　賣因：' + esc(t.sell.why) + '</div></div>').join("<hr>") +
         (r.open ? (r.trades.length ? "<hr>" : "") + '<div>' + buyTxt(r.open) + '<br>持倉中，最新收市（' + r.open.nowDate.slice(5) + '）' + p2(r.open.now) + '　<b class="' + (r.open.ret >= 0 ? "pos" : "neg") + '">' + pc(r.open.ret) + '</b><div class="sub">買因：' + esc(r.open.why) + '</div></div>' : '') +
         (r.pending || []).map(p => '<div class="sub">⏳ ' + wd(p.signalDate) + ' 出' + (p.side === "buy" ? "買入" : "賣出") + '訊號（' + esc(p.why) + '），等待下一個交易日開市價成交</div>').join("");

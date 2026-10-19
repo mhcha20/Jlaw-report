@@ -262,7 +262,7 @@ async function pxRefresh() {
       const e = px.t[t];
       if (e && Date.now() - e.at < 3 * 3600e3) continue;
       try { const r = await priceLib.fetchBars(t); px.t[t] = {at: Date.now(), src: r.src, rows: r.rows.map(b => [b.d, b.o, b.c])}; }
-      catch (err) { console.error("price fetch failed", t, err.message); px.t[t] = {rows: [], ...(e || {}), at: Date.now() - 150 * 60e3, err: err.message}; }   // 失敗 30 分鐘後再試
+      catch (err) { console.error("price fetch failed", t, err.message); px.t[t] = {rows: [], ...(e || {}), at: Date.now() - 170 * 60e3, err: err.message}; }   // 失敗 10 分鐘後再試
       await new Promise(r => setTimeout(r, 300));
     }
     savePx();
@@ -315,7 +315,7 @@ function sigPayload() {
   const files = cache ? new Set(allCards(cache.rows).map(c => c.ticker)).size : rows.length;
   const failedIds = Object.keys(sig.fail).filter(i => !sig.cards[i]).length;
   const bt = {};
-  for (const [t, l] of Object.entries(history)) bt[t] = signals.backtest(l, barsOf(t));
+  for (const [t, l] of Object.entries(history)) { bt[t] = signals.backtest(l, barsOf(t)); if (!bt[t].hasPrices && px.t[t] && px.t[t].err) bt[t].pxErr = px.t[t].err; }
   return {rows, history, bt, feed: feed.slice(0, 40), total: Math.max(files, rows.length), failed: failedIds, pending: sigState.pending, running: sigState.running, err: sigState.err, lastRun: sigState.lastRun,
     px: {have: Object.values(px.t).filter(e => e.rows && e.rows.length).length, failed: Object.values(px.t).filter(e => !(e.rows && e.rows.length)).length,
       src: [...new Set(Object.values(px.t).map(e => e.src).filter(Boolean))].join("/"), lastErr: (Object.values(px.t).find(e => e.err && !(e.rows && e.rows.length)) || {}).err || ""}};
