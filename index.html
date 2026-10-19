@@ -440,10 +440,11 @@ async function loadSheet(force){
   cov.loading = false; renderCov();
 }
 const hkToday = () => new Date(Date.now() + 8*3600e3).toISOString().slice(0,10);
+const tkKey = t => { t = String(t).toUpperCase().replace(/\.(HK|T|KS|KQ|SS|SZ)$/, ""); return /^\d+$/.test(t) ? String(+t) : t; };   // 港／日／韓股：00066、0066、66、0066.HK 視為同一隻
 function covCompute(){
-  const set = new Set(cov.sheet.map(x => x.ticker));
+  const set = new Set(cov.sheet.map(x => tkKey(x.ticker)));
   const live = items.filter(r => !state.deleted.has(r.id) && r.date);
-  const tickerOf = r => r.name.split(/[\s_\-()\[\]]+/).map(t => t.toUpperCase()).find(t => set.has(t)) || "";
+  const tickerOf = r => r.name.replace(/\d{4}-\d{2}-\d{2}|(?<!\d)20\d{6}(?!\d)/, " ").split(/[\s_\-()\[\]]+/).map(tkKey).find(t => set.has(t)) || "";
   const typed = live.filter(r => r.cat === "stock" || r.cat === "card" || r.cat === "verify");
   const today = hkToday();
   const days = [...new Set(typed.map(r => r.date).filter(d => d <= today))].sort().reverse();
@@ -452,7 +453,7 @@ function covCompute(){
   const has = {stock:new Set(), card:new Set(), verify:new Set()}, extras = new Set();
   typed.filter(r => inScope(r.date)).forEach(r => { const t = tickerOf(r); if(t) has[r.cat].add(t); else if(r.ticker) extras.add(r.ticker); });
   const req = cov.sheet.filter(x => cov.scope === "since" || !x.added || x.added <= cov.day);
-  const rows = req.map(x => ({...x, s:has.stock.has(x.ticker), c:has.card.has(x.ticker), v:has.verify.has(x.ticker)}));
+  const rows = req.map(x => ({...x, s:has.stock.has(tkKey(x.ticker)), c:has.card.has(tkKey(x.ticker)), v:has.verify.has(tkKey(x.ticker))}));
   rows.forEach(x => { x.n = (x.s?1:0) + (x.c?1:0) + (x.v?1:0); });
   const mk = live.filter(r => r.cat === "market").map(r => r.date).sort().pop() || "";
   return {rows, days, extras:[...extras].sort(), market:mk};
