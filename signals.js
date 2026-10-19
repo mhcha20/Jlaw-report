@@ -144,11 +144,18 @@ function diffCards(p, c) {
   return {tag: buy && sell ? "mixed" : buy ? "buy" : sell ? "sell" : null, changes: ch};
 }
 
+// 週末日期（例如卡寫「分析交易日 2026-10-17（五）」其實係 10-16 收市）退返上一個交易日（星期五）
+function tradingDate(d) {
+  const t = new Date(d + "T00:00:00Z"); if (isNaN(t)) return d;
+  const w = t.getUTCDay(); if (w === 6) t.setUTCDate(t.getUTCDate() - 1); else if (w === 0) t.setUTCDate(t.getUTCDate() - 2);
+  return t.toISOString().slice(0, 10);
+}
 // 將所有已解析嘅卡按股票、日期整理成時間線
 function buildHistory(cards) {
   const by = new Map();
   for (const c of cards) {
-    const date = c.date || c.fileDate; if (!date || !c.ticker) continue;
+    const raw = c.date || c.fileDate; if (!raw || !c.ticker) continue;
+    const date = tradingDate(raw);
     const l = by.get(c.ticker) || by.set(c.ticker, new Map()).get(c.ticker);
     const o = l.get(date); if (!o || (c.up || "") > (o.up || "")) l.set(date, c);   // 同日多份只留最新上傳
   }
@@ -201,4 +208,4 @@ function backtest(list, prices = [], start = 100) {
     bh: firstFill && lastBar && lastBar.d > firstFill.d ? lastBar.c / firstFill.o - 1 : null, from: list.length ? list[0].date : "", to: lastBar ? lastBar.d : ""};
 }
 
-module.exports = {pdfText, parseCard, classify, diffCards, buildHistory, backtest};
+module.exports = {tradingDate, pdfText, parseCard, classify, diffCards, buildHistory, backtest};
