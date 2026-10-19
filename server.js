@@ -284,7 +284,7 @@ async function sigIndex() {
         const c = todo[next++];
         try {
           const text = await signals.pdfText(await driveBuffer(c.id));
-          const p = signals.parseCard(text);
+          const p = signals.parseCard(text, c.date);
           if (!p.date && !p.rating) throw new Error("讀唔到行動卡內容");
           sig.cards[c.id] = {id: c.id, name: c.name, ticker: c.ticker, fileDate: c.date, up: c.up, size: c.size, ...p, cls: signals.classify(p), at: Date.now()};
           delete sig.fail[c.id];

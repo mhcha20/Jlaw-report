@@ -19,22 +19,26 @@ const num = s => Number(String(s).replace(/,/g, ""));
 const between = (t, a, b) => { const i = t.search(a); if (i < 0) return ""; const rest = t.slice(i); const j = b ? rest.slice(1).search(b) : -1; return j < 0 ? rest : rest.slice(0, j + 1); };
 const trim = (s, n) => { s = (s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
 
-function parseCard(raw) {
-  const t = raw.replace(/[ \t]*\n[ \t]*/g, " ").replace(/\s{2,}/g, " ");
+const RATING = "(?:強烈)?買入|值得買入|觀察|觀望[/／]?中性|觀望|持有[/／]?觀望|持有|減持|賣出|迴避|中立|不建議|避免交易|轉弱[/／]?暫避";
+function parseCard(raw, fallbackDate) {
+  // V2.1 版面用咗康熙部首／相容字（⾏、⽇、∕），先轉返一般字
+  const t = raw.replace(/[\u2E80-\u2FDF\uF900-\uFAFF]/g, c => c.normalize("NFKC")).replace(/∕/g, "/").replace(/[ \t]*\n[ \t]*/g, " ").replace(/\s{2,}/g, " ");
   const r = {};
-  r.date = (t.match(/分析交易日\s*(\d{4}-\d{2}-\d{2})/) || [])[1] || "";
+  const ymd = t.match(/交易日[：:]?\s*(\d{4})年(\d{1,2})月(\d{1,2})日/);
+  r.date = (t.match(/分析交易日\s*(\d{4}-\d{2}-\d{2})/) || t.match(/行動卡\s*[·｜|]?\s*(\d{4}-\d{2}-\d{2})/) || t.match(/(\d{4}-\d{2}-\d{2})\s*收市/) || [])[1]
+    || (ymd ? `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}` : "") || fallbackDate || "";
   const title = t.slice(0, 80);
   r.titleTicker = (title.match(/^\s*([A-Z]{1,5})\b/) || [])[1] || "";
 
-  const s1 = between(t, /1\s*評等/, /2\s*今日動作/);
-  const s2 = between(t, /2\s*今日動作/, /3\s*三條價位/);
-  const s3 = between(t, /3\s*三條價位/, /4\s*(?:最大變化|同上一份)/);
+  const s1 = between(t, /1[】\s]*評等/, /2[】\s]*今日動作/);
+  const s2 = between(t, /2[】\s]*今日動作/, /3[】\s]*三條價位/);
+  const s3 = between(t, /3[】\s]*三條價位/, /4\s*(?:最大變化|同上一份)/);
   const sAl = between(t, /(?:警報\s*要升／跌幾多|5\s*三個警報價)/, /7\s*(?:明日|今日更正)/);
 
   // 評等同分數
-  const rate = s1.match(/(★{1,5})\s*((?:強烈)?買入|觀察|觀望|持有|減持|賣出|迴避|中立)/) || t.match(/(★{1,5})\s*((?:強烈)?買入|觀察|觀望|持有|減持|賣出|迴避|中立)/);
-  if (rate) { r.stars = rate[1].length; r.rating = rate[2]; }
-  const sc = s1.match(/(\d{1,3})\s*[／/]\s*100/) || t.match(/(\d{1,3})\s*[／/]\s*100/);
+  const rate = s1.match(new RegExp("(★[★☆]{0,4})\\s*(" + RATING + ")")) || t.match(new RegExp("(★[★☆]{0,4})\\s*(" + RATING + ")")) || t.match(new RegExp("個股評級\\s*([★☆]{1,5})\\s*(" + RATING + ")"));
+  if (rate) { r.stars = (rate[1].match(/★/g) || []).length; r.rating = rate[2]; }
+  const sc = s1.match(/(?<![\d.])(\d{1,3})\s*[／/]\s*100/) || t.match(/(?<![\d.])(\d{1,3})\s*[／/]\s*100/);
   if (sc) r.score = num(sc[1]);
   const prev = s1.match(/上一份[^｜|]*[｜|]\s*(\d{1,3})\s*[／/]\s*100/) || t.match(/前\s*(\d{1,3})\s*[，,]/);
   if (prev) r.prevScore = num(prev[1]);
@@ -44,12 +48,13 @@ function parseCard(raw) {
   if (cap) r.cap = cap[1].replace(/\s/g, "");
 
   // 今日動作
-  const act = s2.replace(/^2\s*今日動作\s*/, "");
+  const act = s2.replace(/^2[】\s]*今日動作(?:一句[（(][^）)]*[）)])?\s*/, "");
   const iu = act.search(/未持倉\s*[：:]/), ih = act.search(/已持倉\s*[：:]/);
   r.headline = iu > 0 ? trim(act.slice(0, iu), 90) : "";
   r.flat = iu >= 0 ? trim(act.slice(iu, ih > iu ? ih : undefined).replace(/^未持倉\s*[：:]\s*/, ""), 400) : "";
   r.held = ih >= 0 ? trim(act.slice(ih).replace(/^已持倉\s*[：:]\s*/, ""), 400) : "";
   if (iu < 0 && ih < 0) r.flat = trim(act, 300);
+  if (!/動作/.test(s2.slice(0, 12))) { const m = t.match(/今日動作\s*[：:]\s*([^。｜]{1,60})/); if (m) r.flat = trim(m[1], 300); }   // 冇「2 今日動作」格嘅版面
 
   // 三道閘
   const g = (re) => { const m = t.match(re); return m ? m[1] === "✔" : null; };
@@ -86,7 +91,7 @@ function parseCard(raw) {
 // 按卡內文字歸類（機械規則，唔係判斷）
 function classify(c) {
   const flat = c.flat || "", held = c.held || "", gates = c.gates;
-  const noNew = /唔開新倉|零新倉|不開新倉|不建倉|唔建倉|不新增|唔買|不買|空倉觀望|零倉|保持觀望|嚴禁盲目|不入場|唔入場/.test(flat);
+  const noNew = /唔做|空集|唔開新倉|零新倉|不開新倉|不建倉|唔建倉|不新增|唔買|不買|空倉觀望|零倉|保持觀望|嚴禁盲目|不入場|唔入場/.test(flat);
   const wantBuy = /低吸|吸納|分批|建倉|買入|入場|開倉|加碼/.test(flat);
   const open = gates ? Object.values(gates).filter(v => v === true).length : null;
   const failed = gates ? Object.entries(gates).filter(([, v]) => v === false).map(([k]) => ({vol: "量能閘", rr: "2:1閘", atr: "1 ATR閘"}[k])) : [];
