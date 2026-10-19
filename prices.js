@@ -7,7 +7,7 @@ function parseYahoo(j) {
   const q = r.indicators.quote[0], out = [];
   r.timestamp.forEach((ts, i) => {
     if (q.open[i] == null || q.close[i] == null) return;
-    out.push({d: new Date(ts * 1000).toISOString().slice(0, 10), o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i]});   // 美股日線時間戳係開市時間（UTC 13:30／14:30），UTC 日期＝交易日
+    out.push({d: new Date(ts * 1000).toISOString().slice(0, 10), o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i]});   // 日線時間戳係該市場開市時間（美股 UTC 13:30／14:30、港股 01:30、日韓 00:00），UTC 日期＝交易日
   });
   return out.length ? out : null;
 }
@@ -19,18 +19,26 @@ function parseStooq(t) {
   }
   return out.length ? out : null;
 }
+// 行動卡檔名代號 → 行情代號。美股字母；5 位數字＝港股（00066→0066.HK）；6 位數字＝韓股（000660→000660.KS）；4 位數字：0 開頭＝港股，否則日股（7203→7203.T）
+function symbols(t) {
+  if (/^\d{5}$/.test(t)) { const h = String(+t).padStart(4, "0"); return {yahoo: h + ".HK", stooq: h + ".hk"}; }
+  if (/^\d{6}$/.test(t)) return {yahoo: t + ".KS", stooq: ""};
+  if (/^0\d{3}$/.test(t)) return {yahoo: t + ".HK", stooq: t + ".hk"};
+  if (/^\d{4}$/.test(t)) return {yahoo: t + ".T", stooq: t + ".jp"};
+  return {yahoo: t, stooq: t.toLowerCase() + ".us"};
+}
 async function fetchBars(ticker) {
-  const errs = [];
+  const errs = [], sym = symbols(ticker);
   try {
-    const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=6mo&interval=1d&includePrePost=false`, {headers: UA});
+    const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym.yahoo)}?range=6mo&interval=1d&includePrePost=false`, {headers: UA});
     if (!r.ok) throw new Error("yahoo " + r.status);
     const p = parseYahoo(await r.json()); if (p) return {rows: p, src: "yahoo"}; errs.push("yahoo empty");
   } catch (e) { errs.push(e.message); }
-  try {
-    const r = await fetch(`https://stooq.com/q/d/l/?s=${encodeURIComponent(ticker.toLowerCase())}.us&i=d`, {headers: UA});
+  if (sym.stooq) try {
+    const r = await fetch(`https://stooq.com/q/d/l/?s=${encodeURIComponent(sym.stooq)}&i=d`, {headers: UA});
     if (!r.ok) throw new Error("stooq " + r.status);
     const p = parseStooq(await r.text()); if (p) return {rows: p, src: "stooq"}; errs.push("stooq empty");
   } catch (e) { errs.push(e.message); }
   throw new Error(errs.join("; "));
 }
-module.exports = {fetchBars, parseYahoo, parseStooq};
+module.exports = {symbols, fetchBars, parseYahoo, parseStooq};
