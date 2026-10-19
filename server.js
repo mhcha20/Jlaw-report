@@ -276,7 +276,7 @@ async function sigIndex() {
   sigState.running = true; sigState.err = ""; sigState.done = 0;
   try {
     const rows = await sync(false);
-    const todo = allCards(rows).filter(c => !sig.cards[c.id] && !(sig.fail[c.id] && Date.now() - sig.fail[c.id].at < 3600e3));
+    const todo = allCards(rows).filter(c => (!sig.cards[c.id] || sig.cards[c.id].pv !== signals.VERSION) && !(sig.fail[c.id] && Date.now() - sig.fail[c.id].at < 3600e3));   // 解析規則升版後會重讀舊卡
     sigState.pending = todo.length;
     let next = 0;
     const worker = async () => {
@@ -286,7 +286,7 @@ async function sigIndex() {
           const text = await signals.pdfText(await driveBuffer(c.id));
           const p = signals.parseCard(text, c.date);
           if (!p.date && !p.rating) throw new Error("讀唔到行動卡內容");
-          sig.cards[c.id] = {id: c.id, name: c.name, ticker: c.ticker, fileDate: c.date, up: c.up, size: c.size, ...p, cls: signals.classify(p), at: Date.now()};
+          sig.cards[c.id] = {id: c.id, name: c.name, ticker: c.ticker, fileDate: c.date, up: c.up, size: c.size, ...p, cls: signals.classify(p), pv: signals.VERSION, at: Date.now()};
           delete sig.fail[c.id];
         } catch (e) { console.error("signal parse failed", c.name, e.message); sig.fail[c.id] = {at: Date.now(), error: e.message}; }
         sigState.done++; sigState.pending = todo.length - sigState.done;
@@ -328,6 +328,7 @@ async function sigApi(req, res) {
     if (!ADMIN) return json(res, 503, {error: "未設定 ADMIN_PASSWORD"});
     const a = authed(req); if (a !== 200) return json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"});
     Object.values(px.t).forEach(e => { e.at = 0; });
+    sig.fail = {};   // 重新分析：失敗過嘅卡即刻再試
   }
   if (!sigState.running && (force || Date.now() - sigState.lastRun > 60000)) { await Promise.race([sigIndex(), new Promise(r => setTimeout(r, 4000))]); }
   json(res, 200, sigPayload());

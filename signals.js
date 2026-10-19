@@ -19,6 +19,7 @@ const num = s => Number(String(s).replace(/,/g, ""));
 const between = (t, a, b) => { const i = t.search(a); if (i < 0) return ""; const rest = t.slice(i); const j = b ? rest.slice(1).search(b) : -1; return j < 0 ? rest : rest.slice(0, j + 1); };
 const trim = (s, n) => { s = (s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
 
+const VERSION = 3;   // 解析規則版本：改咗解析規則就加 1，伺服器會用新規則重讀所有舊卡
 const RATING = "(?:強烈)?買入|值得買入|觀察|觀望[/／]?中性|觀望|持有[/／]?觀望|持有|減持|賣出|迴避|中立|不建議|避免交易|轉弱[/／]?暫避";
 function parseCard(raw, fallbackDate) {
   // V2.1 版面用咗康熙部首／相容字（⾏、⽇、∕），先轉返一般字
@@ -213,4 +214,4 @@ function backtest(list, prices = [], start = 100) {
     bh: firstFill && lastBar && lastBar.d > firstFill.d ? lastBar.c / firstFill.o - 1 : null, from: list.length ? list[0].date : "", to: lastBar ? lastBar.d : ""};
 }
 
-module.exports = {tradingDate, pdfText, parseCard, classify, diffCards, buildHistory, backtest};
+module.exports = {VERSION, tradingDate, pdfText, parseCard, classify, diffCards, buildHistory, backtest};
