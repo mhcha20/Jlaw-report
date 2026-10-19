@@ -176,7 +176,7 @@ let items = toItems(window.REPORTS);
 
 const $ = s => document.querySelector(s);
 const MKTS = [["all","🌐 全部"], ["us","🇺🇸 美股"], ["hk","🇭🇰 港股"], ["jp","🇯🇵 日股"], ["kr","🇰🇷 韓股"], ["eu","🇪🇺 歐洲"], ["ca","🇨🇦 加拿大"]];
-const MKT_OVERRIDE = {NESN:"eu", SCHN:"eu", ATD:"ca"};   // 英文字母代號但唔係美股（要同 prices.js 嘅 OVERRIDE 一致）
+const MKT_OVERRIDE = {NESN:"eu", SCHN:"eu", ATD:"ca", MC:"eu"};   // 英文字母代號但唔係美股（要同 prices.js 嘅 OVERRIDE 一致）
 // 市場判斷：檔名代號 5 位數字或 0 開頭 4 位＝港股、6 位＝韓股、其他 4 位＝日股、字母＝美股；冇代號嘅報告按名稱關鍵字，否則歸美股
 const mktOf = (t, name) => t ? (MKT_OVERRIDE[t] ? MKT_OVERRIDE[t] : /^(\d{5}|0\d{3})$/.test(t) ? "hk" : /^\d{6}$/.test(t) ? "kr" : /^\d{4}$/.test(t) ? "jp" : "us")
   : /港股|恒生|恆生/.test(name || "") ? "hk" : /日本|日股|日經/.test(name || "") ? "jp" : /韓國|韓股|KOSPI/i.test(name || "") ? "kr" : "us";

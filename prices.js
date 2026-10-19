@@ -21,7 +21,7 @@ function parseStooq(t) {
 }
 // 行動卡檔名代號 → 行情代號。美股字母；5 位數字＝港股（00066→0066.HK）；6 位數字＝韓股（000660→000660.KS）；4 位數字：0 開頭＝港股，否則日股（7203→7203.T）
 // 英文字母代號但唔係美股：手動指定行情代號（歐洲、加拿大等）
-const OVERRIDE = {NESN: "NESN.SW", SCHN: "SCHN.SW", ATD: "ATD.TO"};
+const OVERRIDE = {NESN: "NESN.SW", SCHN: "SCHN.SW", ATD: "ATD.TO", MC: "MC.PA"};
 function symbols(t) {
   if (OVERRIDE[t]) return {yahoo: OVERRIDE[t], stooq: ""};
   if (/^\d{5}$/.test(t)) { const h = String(+t).padStart(4, "0"); return {yahoo: h + ".HK", stooq: h + ".hk"}; }
