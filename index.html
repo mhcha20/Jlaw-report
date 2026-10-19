@@ -454,19 +454,21 @@ async function loadSheet(force){
 }
 const hkToday = () => new Date(Date.now() + 8*3600e3).toISOString().slice(0,10);
 const tkKey = t => { t = String(t).toUpperCase().replace(/\.(HK|T|KS|KQ|SS|SZ)$/, ""); return /^\d+$/.test(t) ? String(+t) : t; };   // 港／日／韓股：00066、0066、66、0066.HK 視為同一隻
+// 週六日嘅檔名日期（例如 10-17 批其實係 10-16 收市）當成上一個星期五，覆蓋檢查先會同 10-16 批併埋計
+const tdate = d => { const t = new Date(d + "T00:00:00Z"); if(isNaN(t)) return d; const w = t.getUTCDay(); if(w === 6) t.setUTCDate(t.getUTCDate() - 1); else if(w === 0) t.setUTCDate(t.getUTCDate() - 2); return t.toISOString().slice(0,10); };
 function covCompute(){
   const set = new Set(cov.sheet.map(x => tkKey(x.ticker)));
   const live = items.filter(r => !state.deleted.has(r.id) && r.date);
   const tickerOf = r => r.name.replace(/\d{4}-\d{2}-\d{2}|(?<!\d)20\d{6}(?!\d)/, " ").split(/[\s_\-()\[\]]+/).map(tkKey).find(t => set.has(t)) || "";
   const typed = live.filter(r => r.cat === "stock" || r.cat === "card" || r.cat === "verify");
   const today = hkToday();
-  const days = [...new Set(typed.map(r => r.date).filter(d => d <= today))].sort().reverse();
+  const days = [...new Set(typed.map(r => tdate(r.date)).filter(d => d <= today))].sort().reverse();
   if(!cov.day || !days.includes(cov.day)) cov.day = days[0] || "";
   const inScope = d => cov.scope === "day" ? d === cov.day : d >= cov.since;
   const has = {stock:new Set(), card:new Set(), verify:new Set()}, extras = new Set();
-  typed.filter(r => inScope(r.date)).forEach(r => { const t = tickerOf(r); if(t) has[r.cat].add(t); else if(r.ticker && mktOk(mktOf(r.ticker, r.name))) extras.add(r.ticker); });
+  typed.filter(r => inScope(tdate(r.date))).forEach(r => { const t = tickerOf(r); if(t) has[r.cat].add(t); else if(r.ticker && mktOk(mktOf(r.ticker, r.name))) extras.add(r.ticker); });
   const sheetMkt = x => /港股/.test(x.theme) ? "hk" : /日股/.test(x.theme) ? "jp" : /韓股/.test(x.theme) ? "kr" : /歐洲/.test(x.theme) ? "eu" : /加拿大/.test(x.theme) ? "ca" : "us";   // 表格主題欄標明市場；其餘當美股
-  const req = cov.sheet.filter(x => mktOk(sheetMkt(x)) && (cov.scope === "since" || !x.added || x.added <= cov.day));
+  const req = cov.sheet.filter(x => mktOk(sheetMkt(x)) && (cov.scope === "since" || !x.added || tdate(x.added) <= cov.day));
   const rows = req.map(x => ({...x, s:has.stock.has(tkKey(x.ticker)), c:has.card.has(tkKey(x.ticker)), v:has.verify.has(tkKey(x.ticker))}));
   rows.forEach(x => { x.n = (x.s?1:0) + (x.c?1:0) + (x.v?1:0); });
   const mk = live.filter(r => r.cat === "market").map(r => r.date).sort().pop() || "";
