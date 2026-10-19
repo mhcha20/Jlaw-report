@@ -276,7 +276,7 @@ async function sigIndex() {
   sigState.running = true; sigState.err = ""; sigState.done = 0;
   try {
     const rows = await sync(false);
-    const todo = allCards(rows).filter(c => (!sig.cards[c.id] || sig.cards[c.id].pv !== signals.VERSION) && !(sig.fail[c.id] && Date.now() - sig.fail[c.id].at < 3600e3));   // 解析規則升版後會重讀舊卡
+    const todo = allCards(rows).filter(c => (!sig.cards[c.id] || sig.cards[c.id].pv !== signals.VERSION || (c.size && sig.cards[c.id].size && String(sig.cards[c.id].size) !== String(c.size))) && !(sig.fail[c.id] && Date.now() - sig.fail[c.id].at < 3600e3));   // 解析規則升版後會重讀舊卡
     sigState.pending = todo.length;
     let next = 0;
     const worker = async () => {
