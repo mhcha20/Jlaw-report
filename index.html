@@ -124,7 +124,7 @@
 <body>
 <header>
   <h1>JLaw 報告中心</h1>
-  <p>共 <span id="total"></span> 份報告 · 撳標題打開 PDF · 剔選後可直接 WhatsApp 分享 ·
+  <p>共 <span id="total"></span> 份報告 · <span id="stk"></span> · 撳標題打開 PDF · 剔選後可直接 WhatsApp 分享 ·
     <a id="f1" target="_blank" rel="noopener">Drive 資料夾 1</a> / <a id="f2" target="_blank" rel="noopener">2</a>
     · <button id="sync" type="button">🔄 同步 Drive</button> <span id="syncAt"></span>
     · <button id="adm" type="button">🔒 管理</button><label id="showHid"><input type="checkbox" id="showHidCb"> 顯示已隱藏</label>
@@ -184,7 +184,12 @@ const state = {cat:"all", mkt:"all", ticker:"all", q:"", sel:new Set(), hidden:n
 try { const s = JSON.parse(localStorage.getItem("jlaw-sel")||"[]"); s.forEach(i => state.sel.add(i)); $("#phone").value = localStorage.getItem("jlaw-phone")||""; } catch(e){}
 
 const shown = () => items.filter(r => !state.deleted.has(r.id) && !state.hidden.has(r.id));
-const updTotal = () => { $("#total").textContent = shown().length; };
+const updTotal = () => {
+  $("#total").textContent = shown().length;
+  const by = {}; new Set(shown().map(r => r.ticker).filter(Boolean)).forEach(t => { const m = mktOf(t); by[m] = (by[m] || 0) + 1; });
+  const n = Object.values(by).reduce((a, b) => a + b, 0);
+  $("#stk").textContent = n + " 隻股票（" + MKTS.slice(1).filter(([k]) => by[k]).map(([k, l]) => l.split(" ")[0] + by[k]).join(" ") + "）";   // 有報告嘅股票數，按市場
+};
 updTotal();
 $("#f1").href = window.FOLDERS[0]; $("#f2").href = window.FOLDERS[1];
 
