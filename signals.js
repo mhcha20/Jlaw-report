@@ -32,7 +32,7 @@ function parseCard(raw) {
   const sAl = between(t, /(?:警報\s*要升／跌幾多|5\s*三個警報價)/, /7\s*(?:明日|今日更正)/);
 
   // 評等同分數
-  const rate = s1.match(/(★{1,5})\s*((?:強烈)?買入|觀察|持有|減持|賣出|迴避|中立)/) || t.match(/(★{1,5})\s*((?:強烈)?買入|觀察|持有|減持|賣出|迴避|中立)/);
+  const rate = s1.match(/(★{1,5})\s*((?:強烈)?買入|觀察|觀望|持有|減持|賣出|迴避|中立)/) || t.match(/(★{1,5})\s*((?:強烈)?買入|觀察|觀望|持有|減持|賣出|迴避|中立)/);
   if (rate) { r.stars = rate[1].length; r.rating = rate[2]; }
   const sc = s1.match(/(\d{1,3})\s*[／/]\s*100/) || t.match(/(\d{1,3})\s*[／/]\s*100/);
   if (sc) r.score = num(sc[1]);
@@ -57,7 +57,7 @@ function parseCard(raw) {
   r.gates = Object.values(gates).some(v => v !== null) ? gates : null;
 
   // 價位
-  const close = t.match(/收市(?:價)?\s*[$＄]?\s*([\d,]+\.\d+)/); if (close) r.close = num(close[1]);
+  const close = t.match(/收市(?:價)?\s*(?:[（(][A-Z]{3}[）)])?\s*[$＄]?\s*([\d,]+(?:\.\d+)?)/); if (close) r.close = num(close[1]);
   const lv = {};
   const re = /(買入觸發|追價上限|減倉|離場／止損|離場|止損)(?:（[^）]*）)?[：:\s]*[$＄]?([\d,]+(?:\.\d+)?)[：:\s]*([▲▼])\s*([\d.]+)%/g;
   let m;
@@ -76,7 +76,7 @@ function parseCard(raw) {
     while ((m = a2.exec(sAl))) alerts.push({price: num(m[1]), dir: m[3] === "升" ? "up" : "down", pct: num(m[4]), note: trim(m[2], 48)});
   }
   if (!alerts.length) {
-    const a3 = /(?:^|\s)[$＄]?([\d,]+\.\d{1,3})\s+(?:[▲▼]\s*([\d.]+)%|現價\s+[\d.]+%|要([升跌])\s*[\d.]+%)\s*([^\d]*?)(?=\s[$＄]?[\d,]+\.\d{1,3}\s+(?:[▲▼]|現價|要)|$)/g;
+    const a3 = /(?:^|\s)[$＄]?([\d,]+(?:\.\d{1,3})?)\s+(?:[▲▼]\s*([\d.]+)%|現價\s+[\d.]+%|要([升跌])\s*[\d.]+%)\s*([^\d]*?)(?=\s[$＄]?[\d,]+(?:\.\d{1,3})?\s+(?:[▲▼]|現價|要)|$)/g;
     while ((m = a3.exec(sAl))) if (m[2]) alerts.push({price: num(m[1]), dir: /▲/.test(m[0]) ? "up" : "down", pct: num(m[2]), note: trim(m[4], 48)});
   }
   r.alerts = alerts;
