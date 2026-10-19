@@ -220,7 +220,7 @@ let sig = {cards: {}, fail: {}};
 try { sig = {cards: {}, fail: {}, ...JSON.parse(fs.readFileSync(SIG_FILE, "utf8"))}; } catch (e) {}
 const sigState = {running: false, pending: 0, done: 0, err: "", lastRun: 0};
 const nameDate = n => { const m = n.match(/\d{4}-\d{2}-\d{2}/) || n.match(/(?<!\d)20\d{6}(?!\d)/); return m ? (m[0].includes("-") ? m[0] : m[0].replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3")) : ""; };
-const nameTicker = n => n.split(/[_\s\-()\[\]]+/).find(t => /^[A-Z]{1,5}$/.test(t)) || "";
+const nameTicker = n => n.replace(/\d{4}-\d{2}-\d{2}|(?<!\d)20\d{6}(?!\d)/, " ").split(/[_\s\-()\[\]]+/).find(t => /^(?:[A-Z]{1,5}|\d{4,6})$/.test(t)) || "";
 async function driveBuffer(id) {
   const r = await fetch(`https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download&confirm=t`);
   const buf = Buffer.from(await r.arrayBuffer());

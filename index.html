@@ -167,7 +167,7 @@ const toItems = rows => rows.map(([cat,id,name,up,size]) => {
   const dm = name.match(/\d{4}-\d{2}-\d{2}/) || name.match(/(?<!\d)20\d{6}(?!\d)/);
   const date = dm ? (dm[0].includes("-") ? dm[0] : dm[0].replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3")) : "";
   const rest = name.replace(dm ? dm[0] : "", "").replace(/\s+_+/, " ").replace(/([-_\s])[-_\s]+/g, "$1").replace(/^[\s_-]+|[\s_-]+$/g, "");   // 例：「[舊版備份] DE_行動卡」
-  const tk = name.split(/[_\s-]+/).find(t => /^[A-Z]{1,5}$/.test(t)) || "";
+  const tk = (dm ? name.replace(dm[0], " ") : name).split(/[_\s-]+/).find(t => /^(?:[A-Z]{1,5}|\d{4,6})$/.test(t)) || "";   // 美股字母代號，或港／日／韓等數字代號（如 00066）
   return {cat, id, name, up, size:size||0, date, title:rest || name, ticker:tk, url:link(id)};
 }).sort((a,b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
 let items = toItems(window.REPORTS);
