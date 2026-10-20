@@ -634,7 +634,9 @@ function btHtml(d){
   const bhs = all.filter(r => r.bh !== null && r.bh !== undefined), bhAvg = bhs.length ? bhs.reduce((s, r) => s + r.bh, 0) / bhs.length : null;
   const from = all.map(r => r.from).filter(Boolean).sort()[0] || "", to = all.map(r => r.to).filter(Boolean).sort().pop() || "";
   const px = d.px || {have:0, failed:0};
-  const sorted = all.slice().sort((a, b) => sg.btSort === "ret" ? b.ret - a.ret : sg.btSort === "low" ? a.ret - b.ret : a.t.localeCompare(b.t));
+  // 最近一次買入訊號日期：已成交買入嘅成交日、持倉中嘅買入日、待成交買單嘅出訊號日（取最新）
+  const lastBuy = r => [...(r.trades || []).map(t => t.buy.fillDate), r.open && r.open.fillDate, ...(r.pending || []).filter(p => p.side === "buy").map(p => p.signalDate)].filter(Boolean).sort().pop() || "";
+  const sorted = all.slice().sort((a, b) => sg.btSort === "new" ? lastBuy(b).localeCompare(lastBuy(a)) || a.t.localeCompare(b.t) : sg.btSort === "ret" ? b.ret - a.ret : sg.btSort === "low" ? a.ret - b.ret : a.t.localeCompare(b.t));
   const sb = (k, l) => '<button class="sm' + (sg.btSort === k ? " on" : "") + '" data-bs="' + k + '">' + l + '</button>';
   const buyTxt = b => wd(b.signalDate) + ' 出訊號 → <b>' + wd(b.fillDate) + ' 開市價 ' + p2(b.price) + ' 買入</b>';
   const sellTxt = s => wd(s.signalDate) + ' 出訊號 → <b>' + wd(s.fillDate) + ' 開市價 ' + p2(s.price) + ' 賣出</b>';
@@ -644,7 +646,7 @@ function btHtml(d){
     (pend ? '　<b>⏳ 待成交：</b>' + pend + ' 單' : '') + (bhAvg !== null ? '　<b>同期一直持有（平均）：</b>' + pc(bhAvg) : '') + '</div>' +
     '<div class="hl mut">成交規則：訊號喺行動卡日期收市後先出 → <b>下一個交易日開市價</b>成交。行情：' + (px.have ? px.have + ' 隻已有' + (px.src ? '（' + esc(px.src) + '）' : '') : '暫時未有') + (px.failed ? '，<span class="neg">' + px.failed + ' 隻攞唔到</span>' : '') + '</div></div>' +
     (px.failed && !px.have ? '<div class="feed"><b>⚠ 未攞到行情</b><div class="note">伺服器暫時讀唔到每日開市價，所以未能計算成交（所有股票顯示 $100）。' + (px.lastErr ? '原因：' + esc(px.lastErr) : '') + '</div></div>' : '') +
-    '<div class="bar">' + sb("ret", "報酬高→低") + sb("low", "報酬低→高") + sb("az", "A–Z") + '</div>' +
+    '<div class="bar">' + sb("ret", "報酬高→低") + sb("low", "報酬低→高") + sb("az", "A–Z") + sb("new", "最新買入") + '</div>' +
     sorted.map(r => {
       const open = sg.btOpen.has(r.t);
       const status = !r.hasPrices ? '⚠ 未攞到行情，計唔到成交' + (r.pxErr ? '（' + esc(r.pxErr) + '）' : '') : r.open ? '持倉中（最新收市 ' + p2(r.open.now) + '，' + r.open.nowDate.slice(5) + '）' : r.traded ? '已平倉' : (r.pending || []).length ? '⏳ 訊號待成交' : '未入場（未有買入訊號）';
@@ -652,7 +654,7 @@ function btHtml(d){
         (r.open ? (r.trades.length ? "<hr>" : "") + '<div>' + buyTxt(r.open) + '<br>持倉中，最新收市（' + r.open.nowDate.slice(5) + '）' + p2(r.open.now) + '　<b class="' + (r.open.ret >= 0 ? "pos" : "neg") + '">' + pc(r.open.ret) + '</b><div class="sub">買因：' + esc(r.open.why) + '</div></div>' : '') +
         (r.pending || []).map(p => '<div class="sub">⏳ ' + wd(p.signalDate) + ' 出' + (p.side === "buy" ? "買入" : "賣出") + '訊號（' + esc(p.why) + '），等待下一個交易日開市價成交</div>').join("");
       return '<div class="btr" data-bt="' + esc(r.t) + '"><div class="top"><span class="big">' + esc(r.t) + '</span><span class="big ' + (r.ret >= 0.00005 ? "pos" : r.ret <= -0.00005 ? "neg" : "") + '">$' + r.final.toFixed(2) + '（' + pc(r.ret) + '）</span></div>' +
-        '<div class="sub">' + r.trades.length + ' 次平倉（勝 ' + r.wins + ' 負 ' + r.losses + '）· ' + status + (r.bh !== null && r.bh !== undefined ? ' · 一直持有 ' + pc(r.bh) : '') + '</div>' +
+        '<div class="sub">' + r.trades.length + ' 次平倉（勝 ' + r.wins + ' 負 ' + r.losses + '）· ' + status + (sg.btSort === "new" && lastBuy(r) ? ' · 最近買入 ' + lastBuy(r).slice(5) : '') + (r.bh !== null && r.bh !== undefined ? ' · 一直持有 ' + pc(r.bh) : '') + '</div>' +
         (open ? '<div class="tr">' + (trs || '<span class="mut">未有交易</span>') + '</div>' : (trs ? '<div class="sub">點擊睇每次買賣日期同價位 ▾</div>' : '')) + '</div>';
     }).join("") +
     '<div class="ft"><b>模擬假設：</b>每隻股票起始 $100；<b>買入訊號出咗之後，下一個交易日開市價買入；賣出訊號出咗之後，下一個交易日開市價全數賣出</b>，所得複利滾存。起始日已係買入狀態亦當作買入訊號。同日買賣訊號並存時，持倉當賣出、未持倉唔買；持倉時再出現買入訊號唔加倉。持倉中按最新收市價計。可買碎股，唔計手續費、滑點同稅。<br><b>留意：</b>開市價嚟自免費日線行情，可能同你券商實際成交價有差異（開市即時價波動大）；只有約 ' + Math.max(...all.map(r => r.days)) + ' 日數據，樣本好少，過去表現唔代表將來；呢個唔係投資建議。</div>';
