@@ -181,6 +181,26 @@ function buildHistory(cards) {
 // ---- 模擬回測：每隻股票起始 $100，訊號出咗之後「下一個交易日開市價」成交，所得滾存 ----
 // 訊號喺卡嘅日期收市後先出：買入訊號 → 下一個交易日開市價買入；賣出訊號 → 下一個交易日開市價全數賣出。
 // prices：[{d:'YYYY-MM-DD', o, c}]（升序）。唔計手續費、滑點；可買碎股。
+// 該日卡嘅詳細情況（買入／賣出原因嘅明細）
+function detail(e) {
+  const L = [];
+  const ch = (e.changes || []).filter(c => c.k !== "market" || true).map(c => c.text);
+  if (e.first) L.push("回測起始日：卡內未持倉" + (e.flat ? "「" + e.flat.label + "」" : "") + (e.held ? "，已持倉「" + e.held.label + "」" : "") + "，當作買入狀態");
+  else if (ch.length) L.push("當日變化：" + ch.join("；"));
+  const st = [];
+  if (e.rating) st.push("評等 " + (e.stars ? "★".repeat(e.stars) + " " : "") + e.rating + (typeof e.score === "number" ? "（" + e.score + " 分）" : ""));
+  if (typeof e.close === "number") st.push("收市 " + fmt2(e.close));
+  if (e.gates) {
+    const g = [["量能", e.gates.vol], ["2:1", e.gates.rr], ["1 ATR", e.gates.atr]].filter(x => x[1] !== null && x[1] !== undefined);
+    if (g.length) st.push("三道閘 " + g.map(x => x[0] + (x[1] ? "✔" : "✘")).join(" "));
+  }
+  if (typeof e.buy === "number") st.push("買入觸發 " + fmt2(e.buy));
+  if (typeof e.stop === "number") st.push("止損 " + fmt2(e.stop));
+  if (e.market) st.push("大盤 " + e.market);
+  if (st.length) L.push("當日卡內：" + st.join(" · "));
+  if (e.flat && e.flat.label) L.push("今日動作：未持倉「" + e.flat.label + "」" + (e.held ? "；已持倉「" + e.held.label + "」" : ""));
+  return L;
+}
 function backtest(list, prices = [], start = 100) {
   const P = prices.filter(b => b && typeof b.o === "number").sort((a, b) => a.d.localeCompare(b.d));
   const nextBar = d => P.find(b => b.d > d);
@@ -190,16 +210,16 @@ function backtest(list, prices = [], start = 100) {
   for (const e of list) {
     const buyEv = e.tag === "buy" || (e.first && e.flat && (e.flat.key === "go" || e.flat.key === "cond"));
     const sellEv = e.tag === "sell" || e.tag === "mixed";
-    if (st === "flat" && buyEv && e.tag !== "mixed") { orders.push({side: "buy", signalDate: e.date, why: e.first ? "起始日已係買入狀態" : (e.changes.find(c => c.dir === "up") || e.changes[0] || {text: "買入訊號"}).text}); st = "long"; }
-    else if (st === "long" && sellEv) { orders.push({side: "sell", signalDate: e.date, why: (e.changes.find(c => c.dir === "down") || e.changes[0] || {text: "賣出訊號"}).text}); st = "flat"; }
+    if (st === "flat" && buyEv && e.tag !== "mixed") { orders.push({side: "buy", signalDate: e.date, why: e.first ? "起始日已係買入狀態" : (e.changes.find(c => c.dir === "up") || e.changes[0] || {text: "買入訊號"}).text, detail: detail(e)}); st = "long"; }
+    else if (st === "long" && sellEv) { orders.push({side: "sell", signalDate: e.date, why: (e.changes.find(c => c.dir === "down") || e.changes[0] || {text: "賣出訊號"}).text, detail: detail(e)}); st = "flat"; }
   }
   // 2) 逐張訂單按下一個交易日開市價成交
   let cash = start, shares = 0, buy = null;
   const trades = [], pending = []; let noData = 0;
   for (const o of orders) {
     const bar = nextBar(o.signalDate);
-    if (!bar) { if (P.length) pending.push({side: o.side, signalDate: o.signalDate, why: o.why}); else noData++; continue; }
-    const fill = {signalDate: o.signalDate, fillDate: bar.d, price: bar.o, why: o.why};
+    if (!bar) { if (P.length) pending.push({side: o.side, signalDate: o.signalDate, why: o.why, detail: o.detail}); else noData++; continue; }
+    const fill = {signalDate: o.signalDate, fillDate: bar.d, price: bar.o, why: o.why, detail: o.detail};
     if (o.side === "buy") { shares = cash / bar.o; buy = fill; }
     else if (buy) { cash = shares * bar.o; trades.push({buy, sell: fill, ret: bar.o / buy.price - 1}); shares = 0; buy = null; }
   }
