@@ -30,4 +30,7 @@
 ## 參考資料
 - `docs/open-card.md`：**開盤睇盤流程卡 V1.0**（點樣用每日三份報告：行動卡／本體報告／核對附錄、盤前三分鐘盤中零閱讀收市後十分鐘、三道閘、常見錯誤）。原檔 `docs/open-card-V1.0-PANW-2026-10-06.pdf`。用戶會就呢份資料跟進，處理相關問題前請先讀。
 - `docs/jw-market-analysis-prompt.md`：**JW 大盤分析指令｜群組共用補充版 V1.0**（每日大盤＋板塊分析嘅完整指令：資料核實規則、SPY／QQQ／IWM、成交量、廣度／VIX、板塊輪動、催化劑、情境、報告格式）。截圖喺 Drive 資料夾 `1M8hNhlePL5MHD-_SvGZlQ02srBHFq_rl`（按日期分子資料夾，檔名 `NN_TICKER_Daily.png`）。用戶要求做大盤分析時按呢份指令執行。
+  - **讀截圖要睇圖像，唔好靠 Drive `read_file_content` 嘅文字辨識**（部分圖會回傳空白，亦可能讀錯）。方法：資料夾係連結分享，免登入，用 `curl -sL -o x.png "https://drive.google.com/uc?export=download&id=<fileId>"` 下載到 scratchpad，再用 Read 工具睇（圖約 3806px，Read 會自動縮細）。fileId 用 Drive `search_files`（`parentId = '<日期資料夾id>'`，每頁只回傳約 5 至 15 個，要跟 `nextPageToken`）攞。
+  - 圖面右下角嘅 UTC 鐘係**截圖時間，唔係 K 線時間**（10/16 批其實係 10/17 星期六重新截，K 線係星期五最終數據）。DXY、US10Y、GC1! 嘅日線喺截圖時通常未收（有倒數計時）。
+  - S&P 500 廣度（S5FI、S5TH）有資料停滯跡象：10/19 圖上兩條線同 10/16 完全相同。引用前要核對。
 - `docs/jlaw-method-notes.md`：**J Law 技術分析／交易方法筆記**（由用戶上傳嘅 51 頁 MYT 文件整理：VCP、拉回買入、swing trade、M.E.T.A. 九大優勢、S&R、趨勢線／通道、移動平均線、見頂四訊號、見底八訊號、套牢處理、選股流程）。用戶會就呢份資料跟進，處理相關問題前請先讀。
