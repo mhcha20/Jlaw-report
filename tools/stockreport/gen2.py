@@ -1,6 +1,8 @@
 from lib import *
 from gen import *
 
+def md(): return DATE[5:].replace('-', '/')
+
 def band(tag, title, parts):
     return f'<div class="band"><span class="chip">{tag}</span><span class="bt">{title}</span><span class="bp">{parts}</span></div>'
 
@@ -57,12 +59,12 @@ def build_report(m, S, T):
     p1 = f'''
 <h1 class="big">{t} 本體報告（檔案②）</h1>
 <p class="subt">{S['zh']}（{S['exch']}）· {S['sector']} · JLaw × MYT 股票分析終極指令 V2.0 · 10 頁硬上限</p>
-<div class="infobox"><b>分析交易日：{DATE_ZH}</b> <span class="pill">正常收市 {DATE}</span> <b>資料截止：</b>美東 {DATE} 16:00＝香港 2026-10-22 04:00　<b>幣別：</b>USD　<b>框架：</b>V2.0<br>
-<b>版本注意：</b>價格唯一來源為 Longbridge 日線（{t}.US，正常交易時段、不復權，319 根）；截圖於美東 10/21 21:30 後拍攝，最後一根 K 線 10/21 為完整收市。上一份＝2026-10-20 行動卡（{prior_short}；其價位資料實為 10/19 收市）。<b>本份係 V2.0 首份試做</b>：承襲帳同大盤執行規則未提供，唔套用、唔自行訂立。九構面分數 ＝ 星數 ÷ 45 × 100（同群組公式一致）。10/21 收市後消息一律不用。AI：Claude（claude-sonnet-5-5，effort medium），直接閱讀截圖圖像。</div>
+<div class="infobox"><b>分析交易日：{DATE_ZH}</b> <span class="pill">正常收市 {DATE}</span> <b>資料截止：</b>{S['asof_full']}　<b>幣別：</b>USD　<b>框架：</b>V2.0<br>
+<b>版本注意：</b>價格唯一來源為 {S['src_note']}（{len(m['closes'])} 根）；{S['shot_note']}，最後一根 K 線 {md()} 為完整收市。上一份＝{S['prev_md']} 行動卡（{prior_short}；其價位資料實為 10/19 收市）。<b>本份係 V2.0 首份試做</b>：承襲帳同大盤執行規則未提供，唔套用、唔自行訂立。九構面分數 ＝ 星數 ÷ 45 × 100（同群組公式一致）。{md()} 收市後消息一律不用。AI：Claude（claude-sonnet-5-5，effort medium），直接閱讀截圖圖像。</div>
 <div class="cards">
- <div class="cd {tone}"><div class="k">個股研究評等</div><div class="v">{S['rating']}　{sc:.0f} / 100</div><div class="s">上一份：10/20 {prior_short}（計法唔同，唔作升降）· 覆蓋率 100%</div></div>
+ <div class="cd {tone}"><div class="k">個股研究評等</div><div class="v">{S['rating']}　{sc:.0f} / 100</div><div class="s">上一份：{S['prev_md']} {prior_short}（計法唔同，唔作升降）· 覆蓋率 100%</div></div>
  <div class="cd {tone}"><div class="k">交易設置狀態</div><div class="v">{T['setup']}</div><div class="s">Pullback {'★'*pbs} · Breakout {'★'*bos}</div></div>
- <div class="cd {tone}"><div class="k">市場狀態及執行限制</div><div class="v">反彈嘗試</div><div class="s">承襲我 10/21 大盤報告；群組執行規則未收到，唔套用倉位上限</div></div>
+ <div class="cd {tone}"><div class="k">市場狀態及執行限制</div><div class="v">反彈嘗試</div><div class="s">承襲 {S['mkt_ref']}；群組執行規則未收到，唔套用倉位上限</div></div>
 </div>
 <div class="concl2"><b>一句話結論：</b>{T['oneliner']}<div class="pl">回踩路徑：{B['zone'][0]:.2f}–{B['zone'][1]:.2f}（止損 {B['stop']:.2f}） · 順勢路徑：{A['trig_rule']}（觸發 {A['trig']:.2f}） · 減倉線 {S['reduce']:.2f}：距 {sg(d['reduce'])} · 離場線 {S['exitp']:.2f}：距 {sg(d['exit'])}，未觸發</div></div>
 {strip_svg(m, S)}
@@ -77,7 +79,7 @@ def build_report(m, S, T):
 '''
     # ---------------- page 2
     p2 = '<div class="pg"></div>' + band('環境', '大市、生命週期及趨勢', '第一至三部分') + \
-        secx('第一部分｜大市分析', 'V2.0 壓縮：只答三條，不重述大盤報告') + f'<p>個股：{S["rating"]}／市場：反彈嘗試（承襲我 10/21 大盤報告，未變）。</p>' + \
+        secx('第一部分｜大市分析', 'V2.0 壓縮：只答三條，不重述大盤報告') + f'<p>個股：{S["rating"]}／市場：反彈嘗試（承襲 {S['mkt_ref']}，未變）。</p>' + \
         table(['觀察對象', '表現', '判斷'], [('(a) 市況分類 vs 上一份', T['p1a'][0], T['p1a'][1]), ('(b) 個股專屬門檻', T['p1b'][0], T['p1b'][1]), ('(c) 大盤生效指示', T['p1c'][0], T['p1c'][1])], ['19%', '58%', '23%']) + \
         secx('第二部分｜股票生命週期（Weinstein）') + f'<p class="lead"><b>{S["stage"]}。</b></p><p>{T["stage_txt"]}</p>' + \
         secx('第三部分｜趨勢分析', '均線方向口徑：全篇統一「對比 5 個交易日前」') + \
@@ -158,17 +160,17 @@ def build_report(m, S, T):
              dict(lo=B['stop'], hi=B['entry'], color='#e0a31e', right=True, op=.30)]
     svg2 = chart(m, 40, ma_list=(10, 20), zones=zones, right_pad=10, width=720, height=330, show_vol=False,
                  hlines=[dict(p=B['entry'], color='#1f3a5f', dash='5,3', w=1), dict(p=B['T'][-1], color='#2e86c1', dash='2,3', w=.9, noscale=True), dict(p=B['stop'], color='#c0392b', dash='3,2', w=1), dict(p=c, color='#555', dash='1,2', w=.8)])
-    p7 = f'<div class="chtitle" style="margin-top:12px">{t} 交易計劃圖（回踩路徑入 {B["entry"]:.2f}／止損 {B["stop"]:.2f}／主目標 {B["T"][-1]:.2f}；10/21 收 {c:.2f}）</div>' + svg2 + \
+    p7 = f'<div class="chtitle" style="margin-top:12px">{t} 交易計劃圖（回踩路徑入 {B["entry"]:.2f}／止損 {B["stop"]:.2f}／主目標 {B["T"][-1]:.2f}；{md()} 收 {c:.2f}）</div>' + svg2 + \
         note('近 40 個交易日日 K ＋ SMA10／20。綠色帶＝回踩入場區、紅色帶＝順勢觸發帶（自該價位成形嗰根 K 線起繪）；右側留白區：琥珀＝風險區（入場→止損）、藍＝報酬區（入場→主目標，超出圖頂以↑標示）；虛線＝參考入場價，右側標示目標、現價、止損。')
     # ---------------- page 8
     ordered = ['趨勢', '成交量', '圖形', 'Momentum', '基本面', '市場配合', '機構支持', 'Pullback', 'Breakout']
     p8 = '<div class="pg"></div>' + band('判斷', '評分及最後結論', '第十二、十三部分') + \
         secx('第十二部分｜交易評分', '本份係首份，九構面全部重新起算，所以每格都寫理由') + \
         table(['構面', '星級', '理由'], [(n_, stars(dd[n_][0]), dd[n_][1]) for n_ in ordered], ['13%', '14%', '73%']) + \
-        note(f'總分：{sc:.0f}／100（{stars_n}／45 星按比例換算 {sc:.1f}，四捨五入；9 項全部評分，覆蓋率 100%；機構支持嘅 Hard Evidence 限於 13F／Form 4 截圖，RS 百分位缺項）。上一份 10/20：{prior_short}（評分表未提供，無法逐格比較，唔當升降）。分數不是勝率，不可跨股比較。') + \
+        note(f'總分：{sc:.0f}／100（{stars_n}／45 星按比例換算 {sc:.1f}，四捨五入；9 項全部評分，覆蓋率 100%；機構支持嘅 Hard Evidence 限於 13F／Form 4 截圖，RS 百分位缺項）。上一份 {S['prev_md']}：{prior_short}（評分表未提供，無法逐格比較，唔當升降）。分數不是勝率，不可跨股比較。') + \
         secx('第十三部分｜最後結論') + f'<div class="concl3"><span>評等 <b>{S["rating"]}</b></span><span>總分 <b>{sc:.0f}／100</b></span><span>個股：{S["rating"]}／市場：反彈嘗試（承襲）</span></div>' + \
         f'<div class="two"><div class="pn"><div class="pt">保留 {S["rating"].split(" ")[0]} 原因</div>{facts(T["keep"])}</div><div class="pn"><div class="pt">不升級的原因</div>{facts(T["noup"])}</div></div>' + \
-        '<h3>與上一份（10/20 行動卡）逐項比較</h3>' + table(['項目', '10/21'], [
+        f'<h3>與上一份（{S["prev_md"]} 行動卡）逐項比較</h3>' + table(['項目', md()], [
             ('評等／分數', f'{S["rating"]}；{sc:.0f}／100（{stars_n} 星：' + '、'.join(f'{n_} {dd[n_][0]}' for n_ in ordered) + '）'),
             ('價格', f'收 {c:.2f}；距 52 週高 {sg((c/S["hi52"]-1)*100)}；SMA10／20／50／200＝{m["ma10"]:.2f}／{m["ma20"]:.2f}／{m["ma50"]:.2f}／{m["ma200"]:.2f}；20／50 日均量 {m["v20"]/1000:.2f}M／{m["v50"]/1000:.2f}M（不含當日）；25 日派發日 {len(m["dist"])} 個'),
             ('上一份', T['vsprior']),
@@ -184,7 +186,7 @@ def build_report(m, S, T):
 def build_appendix(m, S, T):
     t = S['t']
     h = f'<div class="hdr"><h1>{t} 核對附錄｜{DATE_ZH}</h1><div class="info">JLaw × MYT V2.0 檔案③（不限篇幅）</div></div><div class="bar"></div>'
-    s1 = secx('一、承襲門檻對照表', '原文逐字 ＋ 今日實際 ＋ 結果；重算值同原文唔同嘅並列，唔取代') + table(['來源原文（逐字）', '今日實際（10/21 收市）', '結果'], T['thr'], ['40%', '40%', '20%'])
+    s1 = secx('一、承襲門檻對照表', '原文逐字 ＋ 今日實際 ＋ 結果；重算值同原文唔同嘅並列，唔取代') + table(['來源原文（逐字）', '今日實際（收市）', '結果'], T['thr'], ['40%', '40%', '20%'])
     s2 = secx('二、口徑／分母聲明') + facts(T['caliber'])
     s3 = secx('三、多來源並列清單', '唔調和、唔平均、唔挑一個') + table(['項目', '來源甲', '來源乙', '處理'], T['conflicts'], ['16%', '28%', '28%', '28%'])
     s4 = secx('四、對抗式覆核更正記錄') + T['corr_html']
@@ -200,10 +202,10 @@ def build_daily(items):
     for S, m, T in items:
         sc = S['score']
         rows.append((f'<b>{S["t"]}</b>', f'{S["rating"]}', f'{sc:.0f}（新起算，上一份 {S["prior"].split("（")[0].split(" ")[-1]}）', T['daily_action'], T['daily_trig'], T['daily_dist'], T['daily_R'], T['daily_line']))
-    h = '<div class="hdr"><h1>每日跨股總表｜2026-10-21（三）</h1><div class="info">V2.0 第八節｜試做版</div></div><div class="bar"></div>'
+    h = f'<div class="hdr"><h1>每日跨股總表｜{DATE_ZH}</h1><div class="info">V2.0 第八節｜試做版</div></div><div class="bar"></div>'
     tb = table(['股票', '評等', '分數（＋自身箭嘴）', '今日動作', '最近觸發位', '距離％', 'R 值', '最關鍵嗰條線'], rows, ['7%', '8%', '11%', '19%', '16%', '15%', '11%', '13%'])
     sw = '；'.join(f'{S["t"]} 回踩 {S["sweepB"][0]}／{S["sweepB"][1]}＝{S["sweepB"][0]/S["sweepB"][1]*100:.0f}%' for S, m, T in items)
-    cav = ('<div class="box hi"><b>口徑聲明（V2.0 第八節）：</b><ul class="facts"><li>分數唔可以跨股比較 —— 每隻只同自己嘅歷史比。本表兩隻分數係本份首次起算，所以「自身箭嘴」暫時冇得標；上一份（10/20 行動卡）嘅 76／85 分計法未提供，唔作升降。</li>'
+    cav = ('<div class="box hi"><b>口徑聲明（V2.0 第八節）：</b><ul class="facts"><li>分數唔可以跨股比較 —— 每隻只同自己嘅歷史比。本表兩隻分數係本份首次起算，所以「自身箭嘴」暫時冇得標；上一份行動卡嘅分數計法未提供，唔作升降。</li>'
            '<li>距觸發位％、R 值、雜訊被掃率、今日動作　可以跨股比較 → 揀邊隻睇、揀邊隻做，睇呢四欄，唔好睇分數。</li>'
-           f'<li>距離％ ÷ 現價（10/21 收市）；R 值＝回踩路徑，以參考入場價同止損價計。雜訊被掃率（60 日、5 日窗口）：{sw}。</li></ul></div>')
+           f'<li>距離％ ÷ 現價（當日收市）；R 值＝回踩路徑，以參考入場價同止損價計。雜訊被掃率（60 日、5 日窗口）：{sw}。</li></ul></div>')
     return h + tb + cav

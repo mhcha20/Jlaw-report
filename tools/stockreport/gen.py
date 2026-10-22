@@ -1,7 +1,8 @@
 import sys, json
 from lib import *
 
-DATE = '2026-10-21'; DATE_ZH = '2026-10-21（三）'
+DATE = '2026-10-21'; DATE_ZH = '2026-10-21（三）'   # build.py 會覆寫
+def md(): return DATE[5:].replace('-', '/')
 
 # ------------------------------------------------------------------ per-stock specs
 # 每隻股票嘅 spec（S）同敘述（T）由每日排程按截圖／行情產生，唔放喺 repo；欄位定義見 README.md
@@ -12,6 +13,7 @@ def R(entry, stop, tgt): return (tgt - entry) / (entry - stop)
 def plan_numbers(m, S):
     c = m['close']
     A, B = S['A'], S['B']
+    for k_, v_ in dict(asof='16:00 ET（香港 次日 04:00）', asof_full='美東 當日 16:00＝香港 次日 04:00', src_note='網站 /api/ohlcv（Yahoo Finance 日線，正常交易時段、不復權）', shot_note='截圖於當日收市後拍攝', prev_md='前一交易日', mkt_ref='大盤報告').items(): S.setdefault(k_, v_)
     S['A']['risk'] = A['trig'] - A['stop']; S['B']['risk'] = B['entry'] - B['stop']
     S['A']['R'] = [R(A['trig'], A['stop'], t) for t in A['T']]
     S['B']['R'] = [R(B['entry'], B['stop'], t) for t in B['T']]
@@ -76,7 +78,7 @@ def build_card(m, S, prev):
     d = S['dist_to']
     sc = S['score']
     html = f'''
-<div class="hdr"><h1>{t} {S['zh']}｜一頁行動卡</h1><div class="info">分析交易日 {DATE_ZH}｜資料截止 16:00 ET（香港 2026-10-22 04:00）｜正常收市｜USD｜框架 JLaw × MYT V2.0</div></div>
+<div class="hdr"><h1>{t} {S['zh']}｜一頁行動卡</h1><div class="info">分析交易日 {DATE_ZH}｜資料截止 {S['asof']}｜正常收市｜USD｜框架 JLaw × MYT V2.0</div></div>
 <div class="bar"></div>
 <div class="notice">收市 {c:.2f}（USD）。口徑：距離一律 ÷ 現價 {c:.2f}。▲▼ ＝ 該價位相對現價方向。均線＝收市價 SMA（Longbridge 重算，同 TradingView 圖示一致到兩位小數）。分數由本份重新起算，唔可以同其他股票或上一份 {S['prior']} 直接比較。</div>
 <div class="stats"><div><b>{c:.2f}</b><span>收市 {sg(m['chgp'])}</span></div><div><b>{m['volr50']:.1f}%</b><span>成交量÷50 日均量</span></div><div><b>{sg(m['d50'])}</b><span>距 MA50 {m['ma50']:.2f}</span></div><div><b>{sg(m['d200'])}</b><span>距 MA200 {m['ma200']:.2f}</span></div><div><b>{m['atrp']:.2f}%</b><span>ATR14 {m['atr14']:.2f}</span></div></div>
@@ -89,7 +91,7 @@ def build_card(m, S, prev):
  <b>離場</b> {S['exitp']:.2f} {sg(d['exit'])}（收市跌穿）</td></tr>
 <tr><td class="cardn">4</td><td class="lbl">同上一份最大變化</td><td>{prev['biggest']}</td></tr>
 <tr><td class="cardn">5</td><td class="lbl">三個警報價（可入 TradingView）</td><td>{S['alert_txt']}</td></tr>
-<tr><td class="cardn">6</td><td class="lbl">唔做嘅代價</td><td>如果 10/21 收市價 {c:.2f} 照回踩路徑止損 {B['stop']:.2f} 入咗：風險每股 {S['cost_risk']:.2f}（{sg(S['cost_pct'])}）＝ 1R；到 {B['T'][0]:.2f} 只有 {S['cost_R'][0]:.2f}R（{sg(S['cost_pt'][0])}），到主目標 {B['T'][-1]:.2f} 有 {S['cost_R'][-1]:.2f}R（{sg(S['cost_pt'][-1])}）。{prev['cost_tail']}</td></tr>
+<tr><td class="cardn">6</td><td class="lbl">唔做嘅代價</td><td>如果 {md()} 收市價 {c:.2f} 照回踩路徑止損 {B['stop']:.2f} 入咗：風險每股 {S['cost_risk']:.2f}（{sg(S['cost_pct'])}）＝ 1R；到 {B['T'][0]:.2f} 只有 {S['cost_R'][0]:.2f}R（{sg(S['cost_pt'][0])}），到主目標 {B['T'][-1]:.2f} 有 {S['cost_R'][-1]:.2f}R（{sg(S['cost_pt'][-1])}）。{prev['cost_tail']}</td></tr>
 <tr><td class="cardn">7</td><td class="lbl">今日更正</td><td>{prev['corr']}</td></tr>
 </tbody></table>
 <div class="notice" style="margin-top:6px">{prev['foot']}</div>
