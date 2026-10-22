@@ -29,4 +29,5 @@
 
 ## 參考資料
 - `docs/open-card.md`：**開盤睇盤流程卡 V1.0**（點樣用每日三份報告：行動卡／本體報告／核對附錄、盤前三分鐘盤中零閱讀收市後十分鐘、三道閘、常見錯誤）。原檔 `docs/open-card-V1.0-PANW-2026-10-06.pdf`。用戶會就呢份資料跟進，處理相關問題前請先讀。
+- `docs/jw-market-analysis-prompt.md`：**JW 大盤分析指令｜群組共用補充版 V1.0**（每日大盤＋板塊分析嘅完整指令：資料核實規則、SPY／QQQ／IWM、成交量、廣度／VIX、板塊輪動、催化劑、情境、報告格式）。截圖喺 Drive 資料夾 `1M8hNhlePL5MHD-_SvGZlQ02srBHFq_rl`（按日期分子資料夾，檔名 `NN_TICKER_Daily.png`）。用戶要求做大盤分析時按呢份指令執行。
 - `docs/jlaw-method-notes.md`：**J Law 技術分析／交易方法筆記**（由用戶上傳嘅 51 頁 MYT 文件整理：VCP、拉回買入、swing trade、M.E.T.A. 九大優勢、S&R、趨勢線／通道、移動平均線、見頂四訊號、見底八訊號、套牢處理、選股流程）。用戶會就呢份資料跟進，處理相關問題前請先讀。
