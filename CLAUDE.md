@@ -23,7 +23,7 @@
 
 ## 約定
 - 報告檔名：`YYYY-MM-DD_TICKER_類型.pdf`；程式亦兼容 `TICKER-report-YYYY-MM-DD-繁體版`、`TICKER_JLaw_MYT_…_YYYYMMDD` 等格式，日期同股票代號由檔名解析。類型主要由 Drive 資料夾決定。
-- 只提交 `server.js`、`index.html`、`data.js`、`package.json`、`docs/`、`CLAUDE.md`。測試用檔案放 scratchpad，唔好入 repo。
+- 只提交 `server.js`、`index.html`、`data.js`、`package.json`、`docs/`、`CLAUDE.md`，同 `tools/stockreport/`（個股報告生成器，只放通用框架；每隻股票嘅分析內容唔提交）。測試用檔案放 scratchpad，唔好入 repo。
 - 改動前端後，先用 Playwright（`/opt/pw-browsers/chromium`）以 390px 手機闊度測試。
 - 管理功能（上傳／隱藏／刪除／覆蓋檢查／重新分析訊號）需 `ADMIN_PASSWORD`（買賣訊號頁本身公開）；Drive 刪除需用戶 Google 授權（service account 唔可以刪用戶個人 Drive 嘅檔案）。
 
@@ -35,3 +35,4 @@
   - S&P 500 廣度（S5FI、S5TH）有資料停滯跡象：10/19 圖上兩條線同 10/16 完全相同。引用前要核對。
 - `docs/jlaw-myt-stock-prompt-v2.md`：**JLaw × MYT 股票分析終極指令 V2.0**（個股分析：每隻股出一頁行動卡（固定七格）／10 頁本體報告／核對附錄；分析紀律十條；交易計劃層 R1–R4＋三項落地欄位；每日跨股總表；朗讀稿規範）。「一頁行動卡」嘅版面即係 `signals.js` 解析嘅對象，指令改版時要檢查解析規則（見上面「買賣訊號」），有改動記得升 `VERSION`。用戶要求個股分析時按呢份指令執行。
 - `docs/jlaw-method-notes.md`：**J Law 技術分析／交易方法筆記**（由用戶上傳嘅 51 頁 MYT 文件整理：VCP、拉回買入、swing trade、M.E.T.A. 九大優勢、S&R、趨勢線／通道、移動平均線、見頂四訊號、見底八訊號、套牢處理、選股流程）。用戶會就呢份資料跟進，處理相關問題前請先讀。
+- `tools/stockreport/`：**V2.0 個股報告生成器**（行動卡／本體報告 9 頁／核對附錄／每日跨股總表），版面照群組 HPE 本體報告範本；九構面＝趨勢、成交量、圖形、Momentum、基本面、市場配合、機構支持、Pullback、Breakout，分數＝星數÷45×100；均量不含當日；雜訊被掃率＝60 日、5 日窗口。用法、spec 欄位、同 `signals.js` 對版嘅行動卡格式約定見該目錄 `README.md`。上載：`POST /api/upload?name=<檔名>.pdf&cat=auto`（檔名含「行動卡／核對附錄／股票分析／每日跨股總表」自動分類）。
