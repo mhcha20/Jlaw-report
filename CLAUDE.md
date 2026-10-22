@@ -33,4 +33,5 @@
   - **讀截圖要睇圖像，唔好靠 Drive `read_file_content` 嘅文字辨識**（部分圖會回傳空白，亦可能讀錯）。方法：資料夾係連結分享，免登入，用 `curl -sL -o x.png "https://drive.google.com/uc?export=download&id=<fileId>"` 下載到 scratchpad，再用 Read 工具睇（圖約 3806px，Read 會自動縮細）。fileId 用 Drive `search_files`（`parentId = '<日期資料夾id>'`，每頁只回傳約 5 至 15 個，要跟 `nextPageToken`）攞。
   - 圖面右下角嘅 UTC 鐘係**截圖時間，唔係 K 線時間**（10/16 批其實係 10/17 星期六重新截，K 線係星期五最終數據）。DXY、US10Y、GC1! 嘅日線喺截圖時通常未收（有倒數計時）。
   - S&P 500 廣度（S5FI、S5TH）有資料停滯跡象：10/19 圖上兩條線同 10/16 完全相同。引用前要核對。
+- `docs/jlaw-myt-stock-prompt-v2.md`：**JLaw × MYT 股票分析終極指令 V2.0**（個股分析：每隻股出一頁行動卡（固定七格）／10 頁本體報告／核對附錄；分析紀律十條；交易計劃層 R1–R4＋三項落地欄位；每日跨股總表；朗讀稿規範）。「一頁行動卡」嘅版面即係 `signals.js` 解析嘅對象，指令改版時要檢查解析規則（見上面「買賣訊號」），有改動記得升 `VERSION`。用戶要求個股分析時按呢份指令執行。
 - `docs/jlaw-method-notes.md`：**J Law 技術分析／交易方法筆記**（由用戶上傳嘅 51 頁 MYT 文件整理：VCP、拉回買入、swing trade、M.E.T.A. 九大優勢、S&R、趨勢線／通道、移動平均線、見頂四訊號、見底八訊號、套牢處理、選股流程）。用戶會就呢份資料跟進，處理相關問題前請先讀。
