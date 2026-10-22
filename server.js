@@ -249,6 +249,7 @@ function latestCards(rows) {
 // ---- 行情（開市價／收市價）：用嚟模擬「訊號後下一個交易日開市價成交」----
 const priceLib = require("./prices.js");
 const PX_FILE = path.join(DATA_DIR, "prices.json");
+const ohlcvCache = new Map();
 let px = {t: {}};
 try { px = {t: {}, ...JSON.parse(fs.readFileSync(PX_FILE, "utf8"))}; } catch (e) {}
 const pxState = {running: false};
@@ -368,6 +369,13 @@ http.createServer(async (req, res) => {
     return upload(req, res, url).catch(e => { console.error("upload failed", e.message); json(res, 500, {error: e.message}); });
   }
   if (p === "/api/signals" && req.method === "GET") return sigApi(req, res).catch(e => { console.error("signals failed", e.message); json(res, 500, {error: e.message}); });
+  if (p === "/api/ohlcv" && req.method === "GET") {   // 公開唯讀：日線（含成交量）；?t=NVDA&range=2y；30 分鐘快取
+    const t = (url.searchParams.get("t") || "").toUpperCase(), range = /^(1y|2y|5y)$/.test(url.searchParams.get("range") || "") ? url.searchParams.get("range") : "2y";
+    if (!/^[A-Z0-9]{1,8}$/.test(t)) return json(res, 400, {error: "bad ticker"});
+    const k = t + "|" + range, hit = ohlcvCache.get(k);
+    if (hit && Date.now() - hit.at < 30 * 60 * 1000) return json(res, 200, hit.v);
+    return priceLib.fetchOhlcv(t, range).then(v => { const out = {ticker: t, ...v, at: new Date().toISOString()}; ohlcvCache.set(k, {at: Date.now(), v: out}); json(res, 200, out); }).catch(e => json(res, 502, {error: e.message}));
+  }
   if (p === "/api/sheet" && req.method === "GET") return sheetCsv(req, res).catch(e => { console.error("sheet failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/oauth/url" || p === "/oauth/callback") return oauth(req, res, p, url).catch(e => { console.error("oauth failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/hidden" || p === "/api/auth" || p === "/api/hide" || p === "/api/delete") return admin(req, res, p).catch(e => { console.error("admin failed", e.message); json(res, 500, {error: e.message}); });
