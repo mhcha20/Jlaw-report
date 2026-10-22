@@ -16,8 +16,8 @@ def data(ticker, date):
     assert rows and rows[-1]['d'] == date, f'最後一根 K 線 {rows[-1]["d"] if rows else None} ≠ 報告日 {date}（行情未更新？）'
     assert len(rows) >= 260, f'日線只有 {len(rows)} 根'
     rows = rows[-319:] if len(rows) > 319 else rows
-    bars = [[x['d'][5:], x['o'], x['h'], x['l'], x['c'], round(x['v'] / 1000)] for x in rows[-135:]]
-    out = {'closes': [x['c'] for x in rows], 'bars': bars, 'symbol': j['symbol']}
+    bars = [[x['d'][5:], round(x['o'], 4), round(x['h'], 4), round(x['l'], 4), round(x['c'], 4), round(x['v'] / 1000)] for x in rows[-135:]]
+    out = {'closes': [round(x['c'], 4) for x in rows], 'bars': bars, 'symbol': j['symbol']}
     os.makedirs(f'{HERE}/data', exist_ok=True)
     json.dump(out, open(f'{HERE}/data/{ticker}.json', 'w'))
     print(f'{ticker} {j["symbol"]}: {len(rows)} 根，最後 {rows[-1]["d"]} 收 {rows[-1]["c"]} 量 {rows[-1]["v"]:,}')

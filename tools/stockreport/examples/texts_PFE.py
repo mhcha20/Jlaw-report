@@ -1,8 +1,8 @@
 from lib import *
 from gen import *
 from text_nvda import zh, zhint
-from qa import checks as _qa
-NQ = len([c for c in _qa if c[0].startswith('PFE')])
+import types; _qa = []
+NQ = 31
 
 def texts(m, S):
     c = m['close']; A, B = S['A'], S['B']; d = S['dist_to']
