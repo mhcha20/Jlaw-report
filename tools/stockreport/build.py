@@ -20,9 +20,9 @@ assert len(S['action']) <= 40, ('今日動作超過 40 字', len(S['action']))
 assert len(T['script3']) <= 950 and len(T['scriptfull']) <= 3500, '朗讀稿超出字數上限'
 os.makedirs('out', exist_ok=True)
 names = {'card': f'{date}_{t}_行動卡', 'rep': f'{date}_{t}_股票分析終極報告', 'app': f'{date}_{t}_核對附錄'}
-open(f'{names["card"]}.html', 'w').write(page(f'{t} 一頁行動卡', build_card(m, S, T)))
-open(f'{names["rep"]}.html', 'w').write(page(f'{t} 本體報告', build_report(m, S, T)))
-open(f'{names["app"]}.html', 'w').write(page(f'{t} 核對附錄', build_appendix(m, S, T)))
+open(f'{names["card"]}.html', 'w').write(page(f'{t} 一頁行動卡', build_card(m, S, T), S))
+open(f'{names["rep"]}.html', 'w').write(page(f'{t} 本體報告', build_report(m, S, T), S))
+open(f'{names["app"]}.html', 'w').write(page(f'{t} 核對附錄', build_appendix(m, S, T), S))
 jobs = [dict(html=f'{names["card"]}.html', pdf=f'out/{names["card"]}.pdf', footer=f'{t} 一頁行動卡 · {date}'),
         dict(html=f'{names["rep"]}.html', pdf=f'out/{names["rep"]}.pdf', footer=f'{t} 本體報告（檔案②） · {date}'),
         dict(html=f'{names["app"]}.html', pdf=f'out/{names["app"]}.pdf', footer=f'{t} 核對附錄（檔案③） · {date}')]

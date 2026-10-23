@@ -10,9 +10,22 @@ def md(): return DATE[5:].replace('-', '/')
 # ------------------------------------------------------------------ shared builders
 def R(entry, stop, tgt): return (tgt - entry) / (entry - stop)
 
+MARKETS = {
+    'US': dict(mkt='US', asof='16:00 ET（香港 次日 04:00）', asof_full='美東 當日 16:00＝香港 次日 04:00', ccy='USD', cur='$', src_name='Longbridge', smart_hard='13F／Form 4', cov='覆蓋率 100%', ma_chk='同 TradingView 圖示一致到兩位小數'),
+    'HK': dict(mkt='HK', asof='16:00 HKT', asof_full='香港當日 16:00 HKT', ccy='HKD', cur='HK$', src_name='Yahoo', smart_hard='披露易持股／機構持股頁', cov='覆蓋率按實際有圖格數列出', ma_chk='同 Futubull 圖面對照（除息調整價並列唔採用）', mkt_ref='無（只用圖面指數）'),
+    'JP': dict(mkt='JP', asof='15:30 JST（＝14:30 HKT）', asof_full='東京當日 15:30 JST＝香港 14:30 HKT', ccy='JPY', cur='¥', src_name='Yahoo', smart_hard='大量持股報告／機構持股頁', cov='覆蓋率按實際有圖格數列出', ma_chk='同 Futubull 圖面對照（除息調整價並列唔採用）', mkt_ref='無（只用圖面指數）'),
+    'KR': dict(mkt='KR', asof='15:30 KST（＝14:30 HKT）', asof_full='首爾當日 15:30 KST＝香港 14:30 HKT', ccy='KRW', cur='₩', src_name='Yahoo', smart_hard='機構持股頁', cov='覆蓋率按實際有圖格數列出', ma_chk='同 Futubull 圖面對照（除息調整價並列唔採用）', mkt_ref='無（只用圖面指數）'),
+}
+def market_of(t):
+    t = str(t)
+    if t.isdigit(): return 'HK' if len(t) == 5 else 'KR' if len(t) == 6 else 'JP'
+    return 'US'
+def market_defaults(t): return MARKETS[market_of(t)]
+
 def plan_numbers(m, S):
     c = m['close']
     A, B = S['A'], S['B']
+    for k_, v_ in market_defaults(S['t']).items(): S.setdefault(k_, v_)
     for k_, v_ in dict(asof='16:00 ET（香港 次日 04:00）', asof_full='美東 當日 16:00＝香港 次日 04:00', src_note='網站 /api/ohlcv（Yahoo Finance 日線，正常交易時段、不復權）', src_label='Yahoo 日線', mkt_state='反彈嘗試', prev_note='', ver_note='本份係 V2.0 首份試做：承襲帳同大盤執行規則未提供，唔套用、唔自行訂立。', ai_line='AI：Claude，直接閱讀截圖圖像。', shot_note='截圖於當日收市後拍攝', prev_md='前一交易日', mkt_ref='大盤報告').items(): S.setdefault(k_, v_)
     S['A']['risk'] = A['trig'] - A['stop']; S['B']['risk'] = B['entry'] - B['stop']
     S['A']['R'] = [R(A['trig'], A['stop'], t) for t in A['T']]

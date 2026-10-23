@@ -215,8 +215,18 @@ def chips(h):
     for w in ('圖表', '外部', '計算', '推論'):
         h = h.replace(f'[{w}]', f'<span class="tg">{w}</span>')
     return h
-def page(title, body):
-    body = chips(arrows(body))
+def localize(h, S):
+    """按市場（S['ccy']／['cur']…，plan_numbers 設默認）換走寫死嘅美股字眼，唔使每隻 worker 自己後處理"""
+    ccy, cur = S.get('ccy', 'USD'), S.get('cur', '$')
+    if ccy != 'USD': h = h.replace('USD', ccy)
+    if cur != '$': h = re.sub(r'(?<![A-Za-z])\$(?=\d)', lambda _: cur, h)
+    if S.get('src_name', 'Longbridge') != 'Longbridge': h = h.replace('Longbridge', S['src_name'])
+    if S.get('smart_hard', '13F／Form 4') != '13F／Form 4': h = h.replace('13F／Form 4', S['smart_hard'])
+    if S.get('cov', '覆蓋率 100%') != '覆蓋率 100%': h = h.replace('覆蓋率 100%', S['cov'])
+    if S.get('ma_chk'): h = h.replace('同 TradingView 圖示一致到兩位小數', S['ma_chk'])
+    return h
+def page(title, body, S=None):
+    body = chips(arrows(localize(body, S) if S else body))
     return f'<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>{title}</title>{FONTS}<link rel="stylesheet" href="style.css"></head><body>{body}</body></html>'
 
 # ---- 朗讀稿用：數字→口語中文
