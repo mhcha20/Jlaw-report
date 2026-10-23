@@ -3,21 +3,6 @@ from gen import *
 import types; _qa = []
 NQ = 37
 
-D = '零一二三四五六七八九'
-def zhint(n):
-    n = int(n)
-    if n == 0: return '零'
-    s = ''
-    h, r = divmod(n, 100); t, o = divmod(r, 10)
-    if h: s += D[h] + '百'
-    if t: s += ('' if (t == 1 and not h) else D[t]) + '十'
-    elif h and o: s += '零'
-    if o: s += D[o]
-    return s
-def zh(x, d=2):
-    s = f'{abs(x):.{d}f}'; a, b = s.split('.')
-    return zhint(a) + '點' + ''.join(D[int(ch)] for ch in b)
-
 def texts(m, S):
     c = m['close']; A, B = S['A'], S['B']; d = S['dist_to']
     pb = S['prints_B']

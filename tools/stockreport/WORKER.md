@@ -55,6 +55,13 @@ Yahoo 成交量同 Longbridge／TradingView 有時唔同（例：NVDA 2026-09-21
 ## 4b. 篇幅（本體 ≤10 頁，好易爆）
 `fund_rows` 最多 8 行、`risk` 每項 ≤1 行、`pattern_notes` ≤2 條、`smart` 放附錄（唔放本體）。`S['prior']` 字串入面如有括號，第一段（括號前）係評等分數，其餘放最後。`prior` 讀唔到 PDF 時用 `/api/signals` 嘅 rows／history 欄位，並喺附錄第三節註明。
 
+## 4c. 其他提醒（來自試跑）
+- 朗讀稿用 `from lib import zh, zhint`（`zh(221.97)`→「二百二十一點九七」）。
+- 下次財報日：排程 session 冇 Longbridge，查唔到就標「未公布」（唔好估）；有 Longbridge 連接器時 `finance_calendar` 要傳 `category="report"`。
+- 4H／2H 截圖含盤後 bar：圖面 RSI 同價只作參考，日線 RSI 先係正式讀數。
+- 若 50 日均量被單日異常大量（>2.5×中位數）拉高，要喺 `caliber`／`vol_rows` 並列中位數或剔除後數值，並註明。
+- 朗讀稿內嘅倍數、取整、百分比最易錯，要由 spec／計算值產生或逐個入 QA。
+
 ## 5. 覆核（必做）
 **凡係 `texts` 內寫死嘅數字、計數、日期序列，同「從未／最大／最小／連續」類斷言，全部要入 QA 檢查**（ESTC、FPS 兩次試做，初稿分別有 5、8 項錯誤，多數係憑印象寫嘅派發日數、升跌％、「從未觸發」）。
 把報告內所有寫死嘅數字（價、量比、距離、R 值、基本面算術、日期序列）用原始數據獨立重算一次（見 `examples/qa_example.py`），失敗就改文字；更正項數寫入行動卡第 7 格同附錄第四節（`corr`、`corr_html`）；`NQ`（覆核數字個數）要等於 QA 檔實際檢查數，「另有 N 項對照差異」要等於附錄第三節實際並列數，唔好照抄範例。

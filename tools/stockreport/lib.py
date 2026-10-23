@@ -217,3 +217,20 @@ def chips(h):
 def page(title, body):
     body = chips(arrows(body))
     return f'<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>{title}</title>{FONTS}<link rel="stylesheet" href="style.css"></head><body>{body}</body></html>'
+
+# ---- 朗讀稿用：數字→口語中文
+D = '零一二三四五六七八九'
+def zhint(n):
+    n = int(n)
+    if n == 0: return '零'
+    s = ''
+    h, r = divmod(n, 100); t, o = divmod(r, 10)
+    if h: s += D[h] + '百'
+    if t: s += ('' if (t == 1 and not h) else D[t]) + '十'
+    elif h and o: s += '零'
+    if o: s += D[o]
+    return s
+def zh(x, d=2):
+    s = f'{abs(x):.{d}f}'; a, b = s.split('.')
+    return zhint(a) + '點' + ''.join(D[int(ch)] for ch in b)
+

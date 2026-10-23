@@ -1,6 +1,5 @@
 from lib import *
 from gen import *
-from text_nvda import zh, zhint
 import types; _qa = []
 NQ = 31
 
