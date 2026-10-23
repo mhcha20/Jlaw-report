@@ -31,10 +31,11 @@ def main():
         fs = [x for x in ls(a[1]) if x['name'].endswith('.png')]
         nums = sorted(int(x['name'][:2]) for x in fs if re.match(r'\d\d_', x['name']))
         etf = any('Fund_' in x['name'] for x in fs)   # ETF 版面：01–05 技術圖＋06–12 Fund_*（共 12 張）
-        need = list(range(1, 13)) if etf else list(range(1, 18))
-        ok = nums == need
-        print(('OK' if ok else 'INCOMPLETE') + (' (ETF 12 張版面)' if etf and ok else ''), len(fs), '張；缺：', sorted(set(need) - set(nums)))
-        if ok and len(a) > 2:
+        asia = '--asia' in a   # 港股／日股／韓股個股：冇內部人（15），部分冇預測／估值（16、17）→ 只要求 01–14
+        need = list(range(1, 13)) if etf else list(range(1, 15)) if asia else list(range(1, 18))
+        ok = all(n in nums for n in need) if asia and not etf else nums == need
+        print(('OK' if ok else 'INCOMPLETE') + (' (ETF 12 張版面)' if etf and ok else '') + (' (亞洲個股版面)' if asia and ok and not etf else ''), len(fs), '張；缺：', sorted(set(range(1, 18)) - set(nums)) if asia and not etf else sorted(set(need) - set(nums)))
+        if ok and len(a) > 2 and not a[2].startswith('--'):
             os.makedirs(a[2], exist_ok=True)
             for x in fs:
                 with urllib.request.urlopen(f'https://drive.google.com/uc?export=download&id={x["id"]}', timeout=120) as r: open(f'{a[2]}/{x["name"]}', 'wb').write(r.read())

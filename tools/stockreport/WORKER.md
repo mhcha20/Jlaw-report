@@ -18,6 +18,9 @@ python3 drive.py shots <日期資料夾id> /tmp/<TICKER>           # 01–17 齊
 ```
 截圖喺日期資料夾（任務會俾「個股資料夾 id」同「日期資料夾 id」兩個，唔好混）。**唔好用 Drive 嘅文字辨識（部分圖回傳空白或讀錯），要用 Read 工具直接睇圖。** 圖面右下角 UTC 鐘係截圖時間，唔係 K 線時間；盤後價只記錄唔用。
 
+### 亞洲個股版面（港股、日股、韓股，代號全數字；日股 ETF 見下）
+用 `drive.py shots <id> [outDir] --asia`：只要求 01–14；**15 內部人**（亞洲冇）、**16 預測評級**、**17 估值 P/S** 可能缺（例如 000660 缺 15、17；其餘多數缺 15）→ 對應欄位如實標「缺項（該市場冇此頁）」，唔當負面證據；覆蓋率按實際格數列出。價格幣別 HKD／JPY／KRW，日股成交量單位係股（100 股一手）；`S['asof']` 用該市場收市時間（港 16:00 HKT、日 15:00 JST＝14:00 HKT、韓 15:30 KST＝14:30 HKT）；無本地大盤報告就 `S['mkt_ref']`＝『無（只用圖面指數）』，唔好引用美股大盤報告當本地大市。
+
 ### ETF 版面（例如 XLV、XLK、QQQ、SOXX…）
 ETF 資料夾只有 **12 張**：01 Daily／02 Weekly／03 4H／04 2H（TradingView）＋05 Futubull_Chart_Daily ＋06 Fund_Holdings、07 Fund_Portfolio、08 Fund_AUM、09 Fund_Description、10 Fund_Basic_Info、11 Fund_Dividends、12 Fund_Stock_Splits。`drive.py shots` 見到 `OK (ETF 12 張版面)` 就算齊。處理方式：
 - 九構面仍然全部評分：**基本面**按 ETF 持倉集中度／板塊權重／費用率／AUM 變化判斷（唔係公司財報）；**機構支持**冇 13F／Form 4／分析員評級頁 → 標「N/A（ETF 無此頁）」，該構面用持倉 AUM 資金流向或標 3 星並寫明「缺資料，按中性計」（覆蓋率要如實列出少於 100%）；Minervini／CANSLIM 只做可量度嘅價格趨勢項，C／A／N／S／I 標 N/A。
