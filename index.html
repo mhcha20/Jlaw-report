@@ -119,6 +119,27 @@
   #cov th:first-child,#cov td:first-child{text-align:left}
   #cov .tk{font-weight:700} #cov .co{font-size:11px;color:var(--mute)} #cov .ok{color:#16a34a} #cov .no{color:#dc2626;font-weight:700}
   #cov .note{font-size:12px;color:var(--mute);margin:6px 0}
+  #peer .note{font-size:12px;color:var(--mute);margin:6px 0;line-height:1.6}
+  #peer .warnbox{background:var(--card);border:1px solid #d97706;border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.6;margin:8px 0}
+  #peer .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+  #peer .bar input{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit}
+  #peer button.sm{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer}
+  #peer button.sm.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  #peer button.lnk{border:0;background:none;color:var(--brand);padding:2px 0;font:inherit;font-size:13px;cursor:pointer}
+  #peer .pc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
+  #peer .pc .tk{font-size:17px;font-weight:700}
+  #peer .our{font-size:13px;margin:4px 0 6px;color:var(--mute)} #peer .our b{color:var(--ink)}
+  #peer .pr{border-top:1px solid var(--line);padding:7px 0;font-size:13px;line-height:1.6}
+  #peer .own{font-weight:700} #peer .mut{color:var(--mute);font-size:12px}
+  #peer .bd{display:inline-block;font-size:12px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);margin:2px 4px 2px 0;white-space:nowrap}
+  #peer .bd.ok{background:#dcfce7;color:#166534;border-color:#86efac} #peer .bd.warn{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+  #peer .bd.diff{background:#fef3c7;color:#92400e;border-color:#fcd34d} #peer .bd.unk,#peer .bd.na{color:var(--mute)}
+  #peer a.pdf{color:var(--brand);text-decoration:none;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:2px 8px;margin-right:6px;display:inline-block}
+  #peer .act{font-size:12.5px;margin:4px 0;padding:6px 8px;background:var(--bg);border-radius:8px}
+  #peer table.pt{width:100%;border-collapse:collapse;font-size:12.5px;margin:4px 0}
+  #peer table.pt td,#peer table.pt th{padding:3px 4px;border-bottom:1px solid var(--line);text-align:left}
+  #peer .ppl{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);font-size:13.5px}
+  #peer .ppl th,#peer .ppl td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:center} #peer .ppl th:first-child,#peer .ppl td:first-child{text-align:left}
   #toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:#111;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;display:none}
 </style>
 </head>
@@ -145,6 +166,7 @@
   <div id="list"></div>
   <div id="cov" style="display:none"></div>
   <div id="sig" style="display:none"></div>
+  <div id="peer" style="display:none"></div>
 </div>
 
 <div id="bar"><div class="in">
@@ -218,19 +240,19 @@ function btns(el, entries, key){
   entries.forEach(([v,label]) => {
     const b = document.createElement("button");
     b.textContent = label; if(state[key]===v) b.className = "on";
-    b.onclick = async () => { if(v === "cov" && !state.pw){ await doUnlock(); if(!state.pw) return; } state[key]=v; render(); if(v === "cov") loadSheet(false); if(v === "sig") loadSig(false); };
+    b.onclick = async () => { if((v === "cov" || v === "peer") && !state.pw){ await doUnlock(); if(!state.pw) return; } state[key]=v; render(); if(v === "cov") loadSheet(false); if(v === "sig") loadSig(false); if(v === "peer") loadPeers(false); };
     el.appendChild(b);
   });
 }
 function esc(s){ return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 function render(){
-  btns($("#tabs"), [["all","全部"], ["new","🆕 最新上傳"], ["cov","✅ 覆蓋檢查"], ["sig","📊 買賣訊號"], ...Object.entries(CATS)], "cat");
+  btns($("#tabs"), [["all","全部"], ["new","🆕 最新上傳"], ["cov","✅ 覆蓋檢查"], ["sig","📊 買賣訊號"], ["peer","👥 群友對照"], ...Object.entries(CATS)], "cat");
   btns($("#mkts"), MKTS, "mkt");
-  const isCov = state.cat === "cov", isSig = state.cat === "sig";
-  $("#cov").style.display = isCov ? "" : "none"; $("#sig").style.display = isSig ? "" : "none";
-  $("#list").style.display = (isCov || isSig) ? "none" : ""; document.querySelector(".tools").style.display = (isCov || isSig) ? "none" : "";
-  if(isCov || isSig){ $("#chips").style.display = "none"; isCov ? renderCov() : renderSig(); updateBar(); return; }
+  const isCov = state.cat === "cov", isSig = state.cat === "sig", isPeer = state.cat === "peer";
+  $("#cov").style.display = isCov ? "" : "none"; $("#sig").style.display = isSig ? "" : "none"; $("#peer").style.display = isPeer ? "" : "none";
+  $("#list").style.display = (isCov || isSig || isPeer) ? "none" : ""; document.querySelector(".tools").style.display = (isCov || isSig || isPeer) ? "none" : "";
+  if(isCov || isSig || isPeer){ $("#chips").style.display = "none"; isCov ? renderCov() : isSig ? renderSig() : renderPeer(); updateBar(); return; }
   const tickers = [...new Set(items.filter(r => !state.deleted.has(r.id) && (state.showHidden || !state.hidden.has(r.id)) && (state.cat==="all" || state.cat==="new" || r.cat===state.cat) && mktOk(mktOf(r.ticker, r.name))).map(r=>r.ticker).filter(Boolean))].sort();
   if(state.ticker!=="all" && !tickers.includes(state.ticker)) state.ticker="all";
   btns($("#chips"), [["all","所有股票"], ...tickers.map(t=>[t,t])], "ticker");
@@ -277,7 +299,7 @@ function message(){
 }
 function updateBar(){
   const n = state.sel.size;
-  $("#bar").classList.toggle("show", n>0 && state.cat!=="cov" && state.cat!=="sig");
+  $("#bar").classList.toggle("show", n>0 && state.cat!=="cov" && state.cat!=="sig" && state.cat!=="peer");
   $("#cnt").textContent = "已選 " + n + " 份";
   const adm = !!state.pw;
   $("#hide").style.display = adm ? "inline-block" : "none"; $("#del").style.display = adm && state.canDelete ? "inline-block" : "none";
@@ -354,7 +376,7 @@ async function api(path, payload){
   return {ok:r.ok, status:r.status, j};
 }
 function applyVis(j){ state.hidden = new Set(j.hidden||[]); state.deleted = new Set(j.deleted||[]); [...state.sel].forEach(i => { if(state.deleted.has(i)) state.sel.delete(i); }); updTotal(); persist(); render(); }
-function lock(){ if(state.cat === "cov") state.cat = "all"; state.pw = ""; try{ sessionStorage.removeItem("jlaw-pw"); }catch(e){} state.showHidden = false; $("#showHidCb").checked = false; adminUi(); render(); }
+function lock(){ if(state.cat === "cov" || state.cat === "peer"){ state.cat = "all"; pr.data = null; }  state.pw = ""; try{ sessionStorage.removeItem("jlaw-pw"); }catch(e){} state.showHidden = false; $("#showHidCb").checked = false; adminUi(); render(); }
 function adminUi(){
   const on = !!state.pw;
   $("#adm").textContent = on ? "🔓 管理中（退出）" : "🔒 管理"; $("#adm").classList.toggle("on", on);
@@ -668,6 +690,109 @@ function btHtml(d){
         (open ? '<div class="tr">' + (trs || '<span class="mut">未有交易</span>') + '</div>' : (trs ? '<div class="sub">點擊睇每次買賣日期同價位 ▾</div>' : '')) + '</div>';
     }).join("") +
     '<div class="ft"><b>模擬假設：</b>每隻股票起始 $100；<b>買入訊號出咗之後，下一個交易日開市價買入；賣出訊號出咗之後，下一個交易日開市價全數賣出</b>，所得複利滾存。起始日已係買入狀態亦當作買入訊號。同日買賣訊號並存時，持倉當賣出、未持倉唔買；持倉時再出現買入訊號唔加倉。持倉中按最新收市價計。可買碎股，唔計手續費、滑點同稅。<br><b>留意：</b>開市價嚟自免費日線行情，可能同你券商實際成交價有差異（開市即時價波動大）；只有約 ' + Math.max(...all.map(r => r.days)) + ' 日數據，樣本好少，過去表現唔代表將來；呢個唔係投資建議。</div>';
+}
+
+// ---- 群友對照（需管理密碼；唔入買賣訊號）----
+const pr = {data:null, err:"", loading:false, view:"stock", q:"", open:new Set(), older:new Set(), timer:null, ours:null};
+async function loadPeers(force){
+  if(pr.loading || !state.pw) return; pr.loading = true; pr.err = ""; if(!pr.data) renderPeer();
+  try {
+    if(force){ const r0 = await api("/api/peers/refresh"); if(!r0.ok) throw new Error(r0.j.error || r0.status); }
+    const r = await fetch("/api/peers", {headers:{"x-admin-password":state.pw}}); const j = await r.json().catch(() => ({}));
+    if(r.status === 401){ lock(); throw new Error("密碼錯誤，已退出管理"); }
+    if(!r.ok) throw new Error(j.error || r.status);
+    pr.data = j;
+    if(!pr.ours) fetch("/api/signals").then(x => x.json()).then(j2 => { pr.ours = j2.rows || []; renderPeer(); }).catch(() => { pr.ours = []; });
+  } catch(e){ pr.err = e.message; }
+  pr.loading = false; renderPeer();
+  clearTimeout(pr.timer);
+  if(state.cat === "peer" && pr.data && pr.data.state && pr.data.state.running) pr.timer = setTimeout(() => loadPeers(false), 3000);
+}
+const BD = {ok:"✓", warn:"⚠", diff:"來源差異", unk:"？", na:"–"};
+const peerBadges = f => {
+  if(f.image) return '<span class="bd unk">圖像檔，未能自動讀取</span>';
+  if(f.err) return '<span class="bd unk">讀取失敗：' + esc(f.err) + '</span>';
+  const v = f.v; if(!v) return '<span class="bd unk">未核對</span>';
+  const one = (lab, o) => o.st === "na" ? "" : '<span class="bd ' + o.st + '">' + lab + " " + BD[o.st] + '</span>';
+  return one("收市價", v.close) + (v.lag ? '<span class="bd warn">落後一日</span>' : "") + one("均線", v.sma) + one("成交量", v.vol) + (v.verdict === "unk" && v.close.st === "na" && v.sma.st === "na" && v.vol.st === "na" ? '<span class="bd unk">抽唔到可核對數字</span>' : "");
+};
+const fnum = x => typeof x === "number" ? (Math.abs(x) >= 1e5 ? x.toLocaleString("en-US", {maximumFractionDigits:0}) : String(x)) : "";
+function peerDetail(f){
+  const v = f.v, p = f.parsed || {}; let h = "";
+  if(p.action) h += '<div class="act"><b>今日動作：</b>' + esc(p.action) + '</div>';
+  if(v){
+    const rows = [];
+    if(v.close.claim !== undefined) rows.push(["收市價", v.close.claim, v.close.actual, v.close.st, v.close.note]);
+    (v.sma.items || []).forEach(x => rows.push(["SMA" + x.n, x.claim, x.actual, x.st, x.note]));
+    if(v.vol.claim !== undefined) rows.push(["成交量", v.vol.claim, v.vol.actual, v.vol.st, v.vol.note]);
+    if(rows.length) h += '<table class="pt"><tr><th>項目</th><th>卡內</th><th>行情</th><th></th></tr>' + rows.map(r => '<tr><td>' + r[0] + '</td><td>' + fnum(r[1]) + '</td><td>' + fnum(r[2]) + '</td><td>' + BD[r[3]] + (r[4] ? " " + esc(r[4]) : "") + '</td></tr>').join("") + '</table>';
+    if(v.note) h += '<div class="mut">' + esc(v.note) + '</div>';
+  }
+  if(f.textDate && f.textDate !== f.date) h += '<div class="mut">檔名日期 ' + esc(f.date) + '，內文日期 ' + esc(f.textDate) + '（核對以檔名日期為準）</div>';
+  return h || '<div class="mut">冇更多資料</div>';
+}
+const peerLine = (f, older) => {
+  const p = f.parsed || {}, scoreTxt = typeof p.score === "number" ? p.score + " " + esc(p.scoreScale || "") : "";
+  return '<div class="pr"><div><span class="own">' + esc(f.signed ? f.owner : "未簽到") + '</span> <span class="mut">' + esc(f.date || "冇日期") + '</span> · ' +
+    (p.stars ? "★".repeat(p.stars) + " " : "") + esc(p.rating || (f.image || f.err ? "" : "—")) + (scoreTxt ? " · " + scoreTxt : "") + '</div><div>' + peerBadges(f) + '</div>' +
+    '<div><a class="pdf" href="#" data-pdf="' + esc(f.id) + '">📄 PDF</a>' + (!f.image && !f.err ? '<button class="lnk" data-pd="' + esc(f.id) + '">' + (pr.open.has(f.id) ? "▲ 收起" : "▼ 今日動作／核對明細") + '</button>' : '') + '</div>' +
+    (pr.open.has(f.id) ? peerDetail(f) : "") + '</div>';
+};
+const verdictOf = f => f.v ? f.v.verdict : "unk";
+function renderPeer(){
+  const el = $("#peer"); if(state.cat !== "peer") return;
+  const note = '<div class="warnbox">⚠ 負責人＝簽到認領者，未必係實際製作者；核對只比對行情數字，唔代表分析對錯；唔入買賣訊號。</div>';
+  if(pr.err){ el.innerHTML = note + '<p class="note">⚠ ' + esc(pr.err) + '</p><button class="sm" id="prRetry">重試</button>'; $("#prRetry").onclick = () => loadPeers(false); return; }
+  if(!pr.data){ el.innerHTML = note + '<p class="note">讀取中…</p>'; return; }
+  const d = pr.data, st = d.state || {}, all = d.files.filter(f => mktOk(mktOf(f.ticker, f.name)));
+  const cards = all.filter(f => f.kind === "card");
+  const q = pr.q.trim().toLowerCase();
+  const stat = (st.running ? "掃描中…" + (st.pending ? "（仲有 " + st.pending + " 份）" : "") : st.lastRun ? "最後掃描 " + hkTime(new Date(st.lastRun).toISOString()) + " HKT" : "未掃描") +
+    " · " + cards.length + " 份行動卡 / 共 " + all.length + " 份檔案";
+  let h = note + (st.err ? '<div class="warnbox">⚠ ' + esc(st.err) + '</div>' : '') + (d.ownersErr ? '<div class="warnbox">⚠ 簽到表讀取失敗，負責人可能唔齊：' + esc(d.ownersErr) + '</div>' : '') +
+    '<div class="bar"><button class="sm' + (pr.view === "stock" ? " on" : "") + '" data-pv="stock">按股票</button><button class="sm' + (pr.view === "person" ? " on" : "") + '" data-pv="person">按人</button>' +
+    '<input type="search" id="prQ" placeholder="搜尋股票代號／負責人" value="' + esc(pr.q) + '"><button class="sm" id="prRef"' + (st.running ? " disabled" : "") + '>🔄 重新掃描</button></div><div class="note">' + stat + '</div>';
+  if(pr.view === "person"){
+    const by = {}; cards.forEach(f => { const o = f.signed ? f.owner : "未簽到"; (by[o] ||= []).push(f); });
+    const rowsP = Object.entries(by).filter(([o]) => !q || o.toLowerCase().includes(q)).map(([o, l]) => {
+      const okN = l.filter(f => verdictOf(f) === "ok").length, wN = l.filter(f => verdictOf(f) === "warn").length, n = okN + wN;
+      return {o, l, okN, wN, n, tickers:new Set(l.map(f => f.key)).size};
+    }).sort((a, b) => b.l.length - a.l.length || a.o.localeCompare(b.o));
+    h += '<table class="ppl"><tr><th>負責人</th><th>行動卡</th><th>股票</th><th>核對 ✓</th></tr>' + (rowsP.map(r =>
+      '<tr><td>' + esc(r.o) + '</td><td>' + r.l.length + '</td><td>' + r.tickers + '</td><td>' + (r.n ? r.okN + "/" + r.n + "（" + Math.round(r.okN / r.n * 100) + "%）" + (r.n < 5 ? ' <span class="mut">樣本少</span>' : "") : '<span class="mut">未能核對</span>') + (r.wN ? ' <span class="mut">⚠' + r.wN + '</span>' : "") + '</td></tr>').join("") || '<tr><td colspan="4">冇資料</td></tr>') + '</table>' +
+      '<div class="note">核對 ✓＝收市價／均線／成交量冇 ⚠（來源差異當 ✓）；攞唔到行情、圖像檔、抽唔到數字嘅唔計；少過 5 份標「樣本少」。「按人」嘅人名來自簽到表，只代表認領者。</div>';
+  } else {
+    const by = {}; all.forEach(f => { if(f.key) (by[f.key] ||= []).push(f); });
+    const ours = {}; (pr.ours || []).forEach(r => { ours[tkKey(r.ticker)] = r; });
+    const groups = Object.entries(by).map(([k, l]) => ({k, l, tk:(l.find(f => f.kind === "card") || l[0]).ticker, cards:l.filter(f => f.kind === "card"), others:l.filter(f => f.kind !== "card")}))
+      .filter(g => !q || g.tk.toLowerCase().includes(q) || g.l.some(f => (f.signed ? f.owner : "未簽到").toLowerCase().includes(q)))
+      .sort((a, b) => ((b.cards.map(f => f.date).sort().pop()) || "").localeCompare((a.cards.map(f => f.date).sort().pop()) || "") || a.tk.localeCompare(b.tk));
+    h += groups.map(g => {
+      const o = ours[g.k], byOwner = {};
+      g.cards.slice().sort((a, b) => b.date.localeCompare(a.date) || b.mt.localeCompare(a.mt)).forEach(f => { (byOwner[f.signed ? f.owner : "未簽到"] ||= []).push(f); });
+      return '<div class="pc"><span class="tk">' + esc(g.tk) + '</span>' +
+        '<div class="our">我哋：' + (o ? '<b>' + (o.stars ? "★".repeat(o.stars) + " " : "") + esc(o.rating || "—") + (typeof o.score === "number" ? " · " + o.score + " /100" : "") + '</b> · ' + esc(o.date) : (pr.ours ? "未有行動卡" : "讀取中…")) + '</div>' +
+        (Object.values(byOwner).map(l => peerLine(l[0]) + (l.length > 1 ? '<div class="mut">較舊 ' + (l.length - 1) + ' 份：' + l.slice(1).map(f => '<a href="#" data-pdf="' + esc(f.id) + '">' + esc(f.date || "冇日期") + '</a>').join("、") + '</div>' : "")).join("") || '<div class="mut">暫時冇群友行動卡</div>') +
+        (g.others.length ? '<div class="mut" style="margin-top:4px">其他檔案：' + g.others.map(f => '<a href="#" data-pdf="' + esc(f.id) + '">' + ({stock:"本體報告", verify:"核對附錄"}[f.kind] || "其他") + " " + esc(f.date || "") + '</a>').join("、") + '</div>' : '') + '</div>';
+    }).join("") || '<p class="note">冇資料。' + (st.running ? "" : "撳「重新掃描」讀取群友報告資料夾。") + '</p>';
+    h += '<div class="note">每位負責人只顯示該股最新一份行動卡。收市價 ✓＝同行情收市價相符（容差 0.02 或 0.05%）；落後一日＝卡內收市價等於前一交易日收市；均線＝SMA 對行情重算（容差 0.05%）；成交量 ✓ ≤0.5%、來源差異 ≤3%、⚠ >3%；？＝攞唔到行情。</div>';
+  }
+  el.innerHTML = h;
+  el.querySelectorAll("[data-pv]").forEach(b => b.onclick = () => { pr.view = b.dataset.pv; renderPeer(); });
+  el.querySelectorAll("[data-pd]").forEach(b => b.onclick = () => { const i = b.dataset.pd; pr.open.has(i) ? pr.open.delete(i) : pr.open.add(i); renderPeer(); });
+  el.querySelectorAll("[data-pdf]").forEach(a => a.onclick = async e => { e.preventDefault(); await openPeerPdf(a.dataset.pdf); });
+  $("#prRef").onclick = () => loadPeers(true);
+  const qi = $("#prQ"); qi.oninput = e => { pr.q = e.target.value; const p = e.target.selectionStart; renderPeer(); const n = $("#prQ"); n.focus(); n.setSelectionRange(p, p); };
+}
+async function openPeerPdf(id){   // PDF 要密碼：先取檔案再開 blob（先同步開視窗，避免被攔截）
+  const w = window.open("", "_blank");
+  try {
+    const r = await fetch("/api/peers/pdf?id=" + encodeURIComponent(id), {headers:{"x-admin-password":state.pw}});
+    if(r.status === 401){ lock(); throw new Error("密碼錯誤，已退出管理"); }
+    if(!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+    const u = URL.createObjectURL(await r.blob());
+    if(w) w.location = u; else location.href = u;
+  } catch(e){ if(w) w.close(); toast("打開 PDF 失敗：" + e.message); }
 }
 const link0 = id => "https://drive.google.com/file/d/" + id + "/view";
 (async () => {

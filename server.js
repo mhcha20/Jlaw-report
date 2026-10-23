@@ -356,6 +356,167 @@ async function sigApi(req, res) {
   json(res, 200, sigPayload());
 }
 
+// ---- 群友對照（私人 Drive 資料夾，需 ADMIN_PASSWORD；唔入買賣訊號／回測）----
+const peersLib = require("./peers.js");
+const PEERS_FILE = path.join(DATA_DIR, "peers.json");
+const PEER_ROOT = "1jAs8B7c3nbQlUbbBisnzZw_X4aHm8lGO";
+const PEER_FOLDER_KIND = {"1Pr3L2BsRNphAr3Z5IhA41Tuk7bBji-KW": "card", "11kdZ_vCO3luCVBRENlVVMqWkKVK23VaO": "stock", "11pwIinVx2EdbYYEAfqwcwceM89TDctrh": "verify"};
+const peerKindOfFolder = (id, name) => PEER_FOLDER_KIND[id] || (/行動卡/.test(name) ? "card" : /核實|核對/.test(name) ? "verify" : /個股|本體|研究/.test(name) ? "stock" : "");
+let peers = {files: {}, owners: {}, ownersAt: 0, ownersErr: "", fail: {}};
+try { peers = {...peers, ...JSON.parse(fs.readFileSync(PEERS_FILE, "utf8"))}; } catch (e) {}
+const peerState = {running: false, pending: 0, done: 0, err: "", lastRun: 0};
+function savePeers() { const tmp = PEERS_FILE + ".tmp"; fs.writeFileSync(tmp, JSON.stringify(peers)); fs.renameSync(tmp, PEERS_FILE); }
+function csvRows(t) {
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (q) { if (c === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true; else if (c === ",") { row.push(f); f = ""; }
+    else if (c === "\n") { row.push(f); rows.push(row); row = []; f = ""; } else if (c !== "\r") f += c;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  return rows;
+}
+const driveErr = async (what, r) => { const t = (await r.text()).slice(0, 160); return new Error(what + "：Drive " + r.status + (r.status === 401 || r.status === 403 || r.status === 404 ? "（授權過期、未授權或資料夾唔存在，請喺管理模式重新連接 Google）" : "") + " " + t); };
+async function peerList(folderId, tok) {
+  const out = []; let pt = "";
+  do {
+    const q = new URLSearchParams({q: `'${folderId}' in parents and trashed=false`, pageSize: "1000", supportsAllDrives: "true", includeItemsFromAllDrives: "true", fields: "nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,size)", ...(pt && {pageToken: pt})});
+    const r = await fetch("https://www.googleapis.com/drive/v3/files?" + q, {headers: {Authorization: "Bearer " + tok}});
+    if (!r.ok) throw await driveErr("讀取群友報告資料夾失敗", r);
+    const j = await r.json(); out.push(...(j.files || [])); pt = j.nextPageToken || "";
+  } while (pt);
+  return out;
+}
+async function peerScan(tok) {
+  const out = [], seen = new Set();
+  const walk = async (fid, kind, depth) => {
+    if (seen.has(fid) || depth > 3) return; seen.add(fid);
+    for (const f of await peerList(fid, tok)) {
+      if (f.mimeType === "application/vnd.google-apps.folder") await walk(f.id, peerKindOfFolder(f.id, f.name) || kind, depth + 1);
+      else if (f.mimeType === "application/pdf" || /\.pdf$/i.test(f.name)) out.push({...f, kind: kind || peersLib.typeFromName(f.name) || "other"});
+    }
+  };
+  await walk(PEER_ROOT, "", 0);
+  return out;
+}
+async function peerDownload(id, tok) {
+  const r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`, {headers: {Authorization: "Bearer " + tok}});
+  if (!r.ok) throw await driveErr("下載失敗", r);
+  const buf = Buffer.from(await r.arrayBuffer());
+  if (buf.slice(0, 4).toString() !== "%PDF") throw new Error("唔係 PDF");
+  return buf;
+}
+// 簽到表：欄 A 主題、C 代號、E 負責人（只係認領者）
+async function peerOwners(tok) {
+  let text;
+  if (sheetCache && Date.now() - sheetCache.at < 60000) text = sheetCache.csv;
+  else {
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${SHEET_ID}/export?mimeType=text/csv`, {headers: {Authorization: "Bearer " + tok}});
+    if (!r.ok) throw await driveErr("讀取簽到表失敗", r);
+    text = await r.text(); sheetCache = {at: Date.now(), csv: text};
+  }
+  const o = {};
+  for (const c of csvRows(text).slice(1)) {
+    const tk = (c[2] || "").trim().toUpperCase(); if (!tk || tk === "大盤分析" || tk === "TICKER SYMBOL") continue;
+    const k = peersLib.normTicker(tk); if (!o[k]) o[k] = {owner: (c[4] || "").trim(), theme: (c[0] || "").trim()};
+  }
+  return o;
+}
+// 行情代號：全數字代號喺表內可能缺前導零，按表內主題補返（港 5 位／韓 6 位／日 4 位）
+function peerFetchSym(raw, key) {
+  if (!/^\d+$/.test(raw)) return raw;
+  const th = ((peers.owners[key] || {}).theme) || "";
+  return /港股/.test(th) ? raw.padStart(5, "0") : /韓股/.test(th) ? raw.padStart(6, "0") : /日股/.test(th) ? raw.padStart(4, "0") : raw.length >= 4 ? raw : "";
+}
+const peerRowsCache = new Map();
+async function peerRows(sym, needDate) {
+  const c = peerRowsCache.get(sym); if (c && c.need >= needDate) return c.rows;
+  const f = path.join(OHLC_DIR, sym + ".json"); let rows = [], age = Infinity;
+  try { rows = JSON.parse(fs.readFileSync(f, "utf8")); age = Date.now() - fs.statSync(f).mtimeMs; } catch {}
+  const last = rows.length ? rows[rows.length - 1].d : "";
+  if (!rows.length || (last < needDate && age > 30 * 60e3) || age > 24 * 3600e3) {
+    try { const v = await priceLib.fetchOhlcv(sym, "2y"); rows = mergeOhlcv(sym, v.rows); await new Promise(r => setTimeout(r, 300)); }
+    catch (e) { console.error("peers ohlcv failed", sym, e.message); }
+  }
+  peerRowsCache.set(sym, {need: needDate, rows});
+  return rows;
+}
+async function peersRefresh() {
+  if (peerState.running) return;
+  peerState.running = true; peerState.err = ""; peerState.done = 0; peerState.pending = 0; peerRowsCache.clear();
+  try {
+    if (!googleConnected()) throw new Error("未連接 Google（請喺管理模式撳「連接 Google」），讀唔到群友報告資料夾");
+    const tok = await userToken();
+    try { peers.owners = await peerOwners(tok); peers.ownersAt = Date.now(); peers.ownersErr = ""; } catch (e) { peers.ownersErr = e.message; console.error("peers owners failed", e.message); }   // 簽到表讀唔到：沿用舊負責人
+    const list = await peerScan(tok);
+    if (!list.length && Object.keys(peers.files).length) throw new Error("群友報告資料夾回傳 0 份 PDF，保留現有清單");
+    const next = {};
+    for (const f of list) {
+      const old = peers.files[f.id], fi = peersLib.fileInfo(f.name);
+      next[f.id] = {id: f.id, name: f.name, kind: f.kind, size: Number(f.size) || 0, mt: f.modifiedTime || f.createdTime || "", ticker: fi.ticker, fileDate: fi.date, ...(old && old.err && !old.pv ? {err: old.err} : {}), ...(old && String(old.size) === String(Number(f.size) || 0) && old.pv === peersLib.PV ? {claim: old.claim, textDate: old.textDate, image: old.image, err: old.err, pv: old.pv, at: old.at, titleTicker: old.titleTicker} : {})};
+    }
+    peers.files = next; peers.fail = Object.fromEntries(Object.entries(peers.fail || {}).filter(([id]) => next[id]));
+    const todo = Object.values(next).filter(r => r.kind === "card" && r.pv !== peersLib.PV && !(peers.fail[r.id] && Date.now() - peers.fail[r.id] < 3600e3));
+    peerState.pending = todo.length; let n = 0;
+    const worker = async () => {
+      while (n < todo.length) {
+        const r = todo[n++];
+        try {
+          const p = await peersLib.parseCard(await peerDownload(r.id, tok), r.fileDate);
+          r.pv = peersLib.PV; r.at = Date.now(); r.image = !!p.image; r.textDate = p.date || ""; r.titleTicker = p.titleTicker || "";
+          r.claim = p.image ? null : Object.fromEntries(Object.entries(p).filter(([k]) => !["date", "textLen", "titleTicker", "image"].includes(k)));
+          delete r.err; delete peers.fail[r.id];
+        } catch (e) { console.error("peer parse failed", r.name, e.message); peers.fail[r.id] = Date.now(); r.err = e.message; }
+        peerState.done++; peerState.pending = todo.length - peerState.done;
+        if (peerState.done % 5 === 0) savePeers();
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    // 核對（每次都重算：行情會更新）
+    for (const r of Object.values(next)) {
+      if (r.kind !== "card") continue;
+      r.ticker = r.ticker || r.titleTicker || ""; r.date = r.fileDate || r.textDate || "";
+      if (!r.claim || !r.ticker || !r.date) { delete r.v; continue; }
+      const key = peersLib.normTicker(r.ticker), sym = peerFetchSym(r.ticker, key);
+      try { r.v = peersLib.verifyCard({...r.claim, adjHint: r.claim.adjHint}, sym ? await peerRows(sym, r.date) : [], r.date); if (!sym) r.v.note = "未能核對（短數字代號，表內冇對應市場）"; }
+      catch (e) { r.v = {close: {st: "unk"}, sma: {st: "na", items: []}, vol: {st: "na"}, lag: false, verdict: "unk", note: "核對出錯：" + e.message}; }
+    }
+    for (const r of Object.values(next)) if (r.kind !== "card") { r.ticker = r.ticker || ""; r.date = r.fileDate || ""; }
+    savePeers();
+  } catch (e) { peerState.err = e.message; console.error("peers refresh failed", e.message); }
+  finally { peerState.running = false; peerState.pending = 0; peerState.lastRun = Date.now(); }
+}
+const peersGate = (req, res) => {
+  if (!ADMIN) { json(res, 503, {error: "未設定 ADMIN_PASSWORD"}); return false; }
+  const a = authed(req); if (a !== 200) { json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"}); return false; }
+  return true;
+};
+if (process.env.PEERS_AUTO !== "0") { setTimeout(() => { if (googleConnected()) peersRefresh(); }, 45000); setInterval(() => { if (googleConnected()) peersRefresh(); }, 6 * 3600e3); }
+async function peersApi(req, res, p, url) {
+  if (!peersGate(req, res)) return;
+  if (p === "/api/peers/refresh") {
+    if (req.method !== "POST") return json(res, 405, {error: "method"});
+    if (!peerState.running) peersRefresh();
+    return json(res, 202, {state: {...peerState}});
+  }
+  if (p === "/api/peers/pdf") {
+    const id = url.searchParams.get("id") || "";
+    if (!/^[\w-]{10,80}$/.test(id) || !peers.files[id]) return json(res, 404, {error: "唔係群友報告資料夾內嘅檔案"});
+    if (!googleConnected()) return json(res, 503, {error: "未連接 Google"});
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`, {headers: {Authorization: "Bearer " + await userToken()}});
+    if (!r.ok || !r.body) throw await driveErr("下載失敗", r);
+    res.writeHead(200, {"Content-Type": "application/pdf", "Cache-Control": "private, no-store", ...(r.headers.get("content-length") && {"Content-Length": r.headers.get("content-length")})});
+    return require("stream").Readable.fromWeb(r.body).on("error", () => res.destroy()).pipe(res);
+  }
+  if (req.method !== "GET") return json(res, 405, {error: "method"});
+  if (!peerState.running && !peerState.lastRun && googleConnected()) peersRefresh();   // 重啟後第一次打開：自動掃描
+  const files = Object.values(peers.files).map(r => ({id: r.id, name: r.name, kind: r.kind, size: r.size, mt: r.mt, ticker: r.ticker, key: peersLib.normTicker(r.ticker), date: r.date || r.fileDate || "", textDate: r.textDate || "",
+    owner: (peers.owners[peersLib.normTicker(r.ticker)] || {}).owner || "", signed: !!(peers.owners[peersLib.normTicker(r.ticker)] || {}).owner,
+    image: !!r.image, err: r.err || "", parsed: r.claim || null, v: r.v || null}));
+  json(res, 200, {files, state: {...peerState}, ownersAt: peers.ownersAt, ownersErr: peers.ownersErr, googleConnected: googleConnected()});
+}
+
 async function admin(req, res, p) {
   if (p === "/api/hidden" && req.method === "GET") return json(res, 200, {...visJson(), adminEnabled: !!ADMIN, canDelete: googleConnected() || !!process.env.GOOGLE_SA_JSON, canUpload: googleConnected(), googleReady: !!(G_ID && G_SECRET), googleConnected: googleConnected()});
   if (req.method !== "POST") return json(res, 405, {error: "method"});
@@ -412,6 +573,7 @@ http.createServer(async (req, res) => {
       json(res, 200, {folder: fid, files: out});
     })().catch(e => json(res, 502, {error: e.message}));
   }
+  if (p === "/api/peers" || p === "/api/peers/refresh" || p === "/api/peers/pdf") return peersApi(req, res, p, url).catch(e => { console.error("peers failed", e.message); if (!res.headersSent) json(res, 502, {error: e.message}); else res.destroy(); });
   if (p === "/api/sheet" && req.method === "GET") return sheetCsv(req, res).catch(e => { console.error("sheet failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/oauth/url" || p === "/oauth/callback") return oauth(req, res, p, url).catch(e => { console.error("oauth failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/hidden" || p === "/api/auth" || p === "/api/hide" || p === "/api/delete") return admin(req, res, p).catch(e => { console.error("admin failed", e.message); json(res, 500, {error: e.message}); });

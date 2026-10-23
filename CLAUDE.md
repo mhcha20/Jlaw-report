@@ -21,9 +21,15 @@
 - 行動卡版面變更時要更新 `signals.js` 嘅解析規則（以 `2 今日動作`、`3 三條價位` 等格標題切段）。真實卡文字屬內部資料，測試用文本放 scratchpad，唔好提交入 repo。
 - 未有讀取：個股本體報告、核對附錄。
 
+## 群友對照（👥 分頁，獨立，唔入訊號／回測）
+- 資料來源：私人 Drive 資料夾「群友報告」`1jAs8B7c3nbQlUbbBisnzZw_X4aHm8lGO`（子資料夾 行動卡_群友／個股研究報告_群友／核實報告_群友），用用戶 Google OAuth token（`userToken()`）讀；簽到表（分頁「個股 research list」欄 C 代號、欄 E 負責人）決定負責人。**簽到只代表認領者，未必係實際製作者**；未簽到歸「未簽到」；全數字代號按數值正規化（66＝00066）。
+- `peers.js`：寬鬆解析行動卡文字（代號、日期、評等、分數＋制式、收市價、成交量、SMA、今日動作摘要）＋`verifyCard()` 對行情核對（容差同 `tools/stockreport/peers.py`）。本體報告／核對附錄只記檔案資訊。改解析規則要升 `PV`。
+- API 全部需 `ADMIN_PASSWORD`（內含群友名）：`GET /api/peers`、`POST /api/peers/refresh`、`GET /api/peers/pdf?id=`（只准該資料夾內嘅檔案）。結果存 `/data/peers.json`，每 6 小時自動更新，size 無變嘅卡唔重讀；行情用 `fetchOhlcv`／`mergeOhlcv`（`/data/ohlcv`）。前端 PDF 用 fetch＋blob 開（要帶密碼 header）。
+- 核對只比對行情數字，唔代表分析對錯。
+
 ## 約定
 - 報告檔名：`YYYY-MM-DD_TICKER_類型.pdf`；程式亦兼容 `TICKER-report-YYYY-MM-DD-繁體版`、`TICKER_JLaw_MYT_…_YYYYMMDD` 等格式，日期同股票代號由檔名解析。類型主要由 Drive 資料夾決定。
-- 只提交 `server.js`、`index.html`、`data.js`、`package.json`、`docs/`、`CLAUDE.md`，同 `tools/stockreport/`（個股報告生成器，只放通用框架；每隻股票嘅分析內容唔提交）。測試用檔案放 scratchpad，唔好入 repo。
+- 只提交 `server.js`、`index.html`、`data.js`、`peers.js`、`package.json`、`docs/`、`CLAUDE.md`，同 `tools/stockreport/`（個股報告生成器，只放通用框架；每隻股票嘅分析內容唔提交）。測試用檔案放 scratchpad，唔好入 repo。
 - 改動前端後，先用 Playwright（`/opt/pw-browsers/chromium`）以 390px 手機闊度測試。
 - 管理功能（上傳／隱藏／刪除／覆蓋檢查／重新分析訊號）需 `ADMIN_PASSWORD`（買賣訊號頁本身公開）；Drive 刪除需用戶 Google 授權（service account 唔可以刪用戶個人 Drive 嘅檔案）。
 
