@@ -185,7 +185,7 @@ def build_report(m, S, T):
 
 def build_appendix(m, S, T):
     t = S['t']
-    h = f'<div class="hdr"><h1>{t} 核對附錄｜{DATE_ZH}</h1><div class="info">JLaw × MYT V2.0 檔案③（不限篇幅）</div></div><div class="bar"></div>'
+    h = f'<div class="hdr"><h1>{t} 核對附錄｜{DATE_ZH}</h1><div class="info">JLaw × MYT V2.0（不限篇幅）</div></div><div class="bar"></div>'
     s1 = secx('一、承襲門檻對照表', '原文逐字 ＋ 今日實際 ＋ 結果；重算值同原文唔同嘅並列，唔取代') + table(['來源原文（逐字）', '今日實際（收市）', '結果'], T['thr'], ['40%', '40%', '20%'])
     s2 = secx('二、口徑／分母聲明') + facts(T['caliber'])
     s3 = secx('三、多來源並列清單', '唔調和、唔平均、唔挑一個') + table(['項目', '來源甲', '來源乙', '處理'], T['conflicts'], ['16%', '28%', '28%', '28%'])

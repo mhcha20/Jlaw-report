@@ -25,7 +25,7 @@ open(f'{names["rep"]}.html', 'w').write(page(f'{t} 本體報告', build_report(m
 open(f'{names["app"]}.html', 'w').write(page(f'{t} 核對附錄', build_appendix(m, S, T), S))
 jobs = [dict(html=f'{names["card"]}.html', pdf=f'out/{names["card"]}.pdf', footer=f'{t} 一頁行動卡 · {date}'),
         dict(html=f'{names["rep"]}.html', pdf=f'out/{names["rep"]}.pdf', footer=f'{t} 本體報告 · {date}'),
-        dict(html=f'{names["app"]}.html', pdf=f'out/{names["app"]}.pdf', footer=f'{t} 核對附錄（檔案③） · {date}')]
+        dict(html=f'{names["app"]}.html', pdf=f'out/{names["app"]}.pdf', footer=f'{t} 核對附錄 · {date}')]
 json.dump(jobs, open(f'out/jobs_{t}.json', 'w'))
 subprocess.check_call(['node', 'render.js', f'out/jobs_{t}.json'])
 res = {}
