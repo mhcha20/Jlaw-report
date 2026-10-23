@@ -88,3 +88,14 @@ python3 drive.py reports <TICKER> <DATE>      # 上載前後都查：同 ticker 
 - QA 容差要細過最後一位；顯示捨入邊界（x.xx5）要跟 TradingView 圖面。
 - Futubull 圖偶有孤立 K 線／4H RSI 同日線一樣，視為顯示異常，只並列唔採用。
 - `from lib import *` 會覆蓋 `HERE`，QA 檔自己嘅路徑另起名。
+
+## 亞洲／日股 ETF 補充（2640 演練回饋）
+- TSE 收市 15:30 JST（＝14:30 HKT），唔係 15:00。
+- Futubull ETF 截圖 09–12 檔名同內容可能對唔上（09 係 Stock Splits、10–12 全係派息頁）；費用率／追蹤指數／成立日缺項時基本面按中性 3 星並列。
+- `prep.py data` 成交量存整數千股，細流動性標的（日量幾 K 股）會失真；要用 `/api/ohlcv` 自寫 data 並存「股」。
+- 通用檔寫死 USD／$／美東 16:00／13F／Longbridge 字眼，非美股要喺 work 檔 `page()` 後處理替換（JPY、¥、Yahoo）。
+- `signals.js` titleTicker 只認字母代號，數字代號靠檔名；`S['zh']` 用短名避免標題換行。
+- Futubull／TradingView 圖面為前復權，高息 ETF 長週期均線（MA120／250）同不復權價有差，並列唔採用。
+- `plan_numbers` 固定 t1（大市上升）=False，亞洲冇本地大盤報告時要自行處理並註明。
+- 趨勢轉折標的先跑 `mv_table`（Minervini 第 2、3 項：MA150>MA200、MA200 向上一個月）再判斷階段。
+- `drive.py latest` 唔會顯示同日舊檔，要用 `drive.py reports`。
