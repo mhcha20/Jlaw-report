@@ -13,7 +13,7 @@ def R(entry, stop, tgt): return (tgt - entry) / (entry - stop)
 def plan_numbers(m, S):
     c = m['close']
     A, B = S['A'], S['B']
-    for k_, v_ in dict(asof='16:00 ET（香港 次日 04:00）', asof_full='美東 當日 16:00＝香港 次日 04:00', src_note='網站 /api/ohlcv（Yahoo Finance 日線，正常交易時段、不復權）', shot_note='截圖於當日收市後拍攝', prev_md='前一交易日', mkt_ref='大盤報告').items(): S.setdefault(k_, v_)
+    for k_, v_ in dict(asof='16:00 ET（香港 次日 04:00）', asof_full='美東 當日 16:00＝香港 次日 04:00', src_note='網站 /api/ohlcv（Yahoo Finance 日線，正常交易時段、不復權）', src_label='Yahoo 日線', mkt_state='反彈嘗試', prev_note='', ver_note='本份係 V2.0 首份試做：承襲帳同大盤執行規則未提供，唔套用、唔自行訂立。', ai_line='AI：Claude，直接閱讀截圖圖像。', shot_note='截圖於當日收市後拍攝', prev_md='前一交易日', mkt_ref='大盤報告').items(): S.setdefault(k_, v_)
     S['A']['risk'] = A['trig'] - A['stop']; S['B']['risk'] = B['entry'] - B['stop']
     S['A']['R'] = [R(A['trig'], A['stop'], t) for t in A['T']]
     S['B']['R'] = [R(B['entry'], B['stop'], t) for t in B['T']]
@@ -80,7 +80,7 @@ def build_card(m, S, prev):
     html = f'''
 <div class="hdr"><h1>{t} {S['zh']}｜一頁行動卡</h1><div class="info">分析交易日 {DATE_ZH}｜資料截止 {S['asof']}｜正常收市｜USD｜框架 JLaw × MYT V2.0</div></div>
 <div class="bar"></div>
-<div class="notice">收市 {c:.2f}（USD）。口徑：距離一律 ÷ 現價 {c:.2f}。▲▼ ＝ 該價位相對現價方向。均線＝收市價 SMA（Longbridge 重算，同 TradingView 圖示一致到兩位小數）。分數由本份重新起算，唔可以同其他股票或上一份 {S['prior']} 直接比較。</div>
+<div class="notice">收市 {c:.2f}（USD）。口徑：距離一律 ÷ 現價 {c:.2f}。▲▼ ＝ 該價位相對現價方向。均線＝收市價 SMA（{S['src_label']} 重算，同 TradingView 圖示一致到兩位小數）。分數由本份重新起算，唔可以同其他股票或上一份 {S['prior']} 直接比較。</div>
 <div class="stats"><div><b>{c:.2f}</b><span>收市 {sg(m['chgp'])}</span></div><div><b>{m['volr50']:.1f}%</b><span>成交量÷50 日均量</span></div><div><b>{sg(m['d50'])}</b><span>距 MA50 {m['ma50']:.2f}</span></div><div><b>{sg(m['d200'])}</b><span>距 MA200 {m['ma200']:.2f}</span></div><div><b>{m['atrp']:.2f}%</b><span>ATR14 {m['atr14']:.2f}</span></div></div>
 <table class="card"><colgroup><col style="width:4%"><col style="width:15%"><col style="width:81%"></colgroup><tbody>
 <tr><td class="cardn">1</td><td class="lbl">評等</td><td><b>今日 {S['rating']}｜{sc:.0f}／100</b>（同上一份並列：{S['prior']}；計法不同，唔作升降）。{S['sub']}。</td></tr>
