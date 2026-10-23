@@ -19,6 +19,8 @@ Playwright／Chromium 已預裝（`/opt/node22/lib/node_modules/playwright`，�
 python3 prep.py data <TICKER> <DATE>          # （網站 /api/ohlcv 曾回 502，重試一次先算失敗；data 同 images 分開跑，唔好用 && 串）網站 /api/ohlcv（Yahoo 日線）→ data/<TICKER>.json；最後一根要＝DATE
 python3 prep.py images <TICKER> /tmp/<TICKER>  # 裁切 Futubull 圖：*_c.png（主畫面）、06–09 另有 *_t.png（標籤欄＋最近 6 季，字夠大）
 ```
+**如果 `prep.py data` 話最後一根 K 線唔係 DATE（Yahoo 過咗 UTC 午夜有時會唔再回傳前一日 bar；網站由 2026-10-23 起會保存已見過嘅日線）**：用 Longbridge MCP `history_candlesticks_by_offset`（period=day, count=5, forward_adjust=false, trade_sessions=intraday）攞最近幾日，再用 `--extra '[{"d":"YYYY-MM-DD","o":..,"h":..,"l":..,"c":..,"v":股數}]'` 補入，並喺附錄第三節註明該日 OHLCV 來源係 Longbridge。
+
 Yahoo 成交量同 Longbridge／TradingView 有時唔同（例：NVDA 2026-09-21 Yahoo 109.8M vs Longbridge 161.3M）；**多來源並列，唔平均**。圖面 MA（TradingView）同重算 SMA 要一致到兩位小數，否則先查（復權、時段）。
 
 > 注意：任務俾你嘅有「個股資料夾 id」同「日期資料夾 id」兩個，**截圖喺日期資料夾**。`_t.png` 拼接圖只啱 NVDA／PFE 嗰種版面（06–09 欄位位置固定）；其他股票先睇 `_c.png`，唔清楚再自己用 PIL 裁左 45%＋右 30%。新上市未滿 200 日嘅股票：`prep.py data` 會因日線 <260 根而失敗——手動放寬 assert、MA200／52 週高低標「N/A（上市未滿 N 日）」並喺 `spec`／`texts` 內避開 MA200 相關欄位。

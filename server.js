@@ -250,6 +250,17 @@ function latestCards(rows) {
 const priceLib = require("./prices.js");
 const PX_FILE = path.join(DATA_DIR, "prices.json");
 const ohlcvCache = new Map();
+const OHLC_DIR = path.join(DATA_DIR, "ohlcv");
+// Yahoo 有時過咗 UTC 午夜就唔再回傳前一日嘅日線 → 本地保存已見過嘅日線（按日期合併，新值覆蓋舊值），每根記 fa＝最後一次攞到嗰刻
+function mergeOhlcv(t, rows) {
+  try { fs.mkdirSync(OHLC_DIR, {recursive: true}); } catch {}
+  const f = path.join(OHLC_DIR, t + ".json"), now = new Date().toISOString(); let old = [];
+  try { old = JSON.parse(fs.readFileSync(f, "utf8")); } catch {}
+  const m = new Map(old.map(r => [r.d, r])); for (const r of rows) m.set(r.d, {...r, fa: now});
+  const out = [...m.values()].sort((a, b) => a.d < b.d ? -1 : 1).slice(-800);
+  try { fs.writeFileSync(f, JSON.stringify(out)); } catch (e) { console.error("ohlcv save failed", e.message); }
+  return out;
+}
 let px = {t: {}};
 try { px = {t: {}, ...JSON.parse(fs.readFileSync(PX_FILE, "utf8"))}; } catch (e) {}
 const pxState = {running: false};
@@ -374,7 +385,7 @@ http.createServer(async (req, res) => {
     if (!/^[A-Z0-9]{1,8}$/.test(t)) return json(res, 400, {error: "bad ticker"});
     const k = t + "|" + range, hit = ohlcvCache.get(k);
     if (hit && Date.now() - hit.at < 30 * 60 * 1000) return json(res, 200, hit.v);
-    return priceLib.fetchOhlcv(t, range).then(v => { const out = {ticker: t, ...v, at: new Date().toISOString()}; ohlcvCache.set(k, {at: Date.now(), v: out}); json(res, 200, out); }).catch(e => json(res, 502, {error: e.message}));
+    return priceLib.fetchOhlcv(t, range).then(v => { const out = {ticker: t, symbol: v.symbol, rows: range === "2y" ? mergeOhlcv(t, v.rows) : v.rows, at: new Date().toISOString()}; ohlcvCache.set(k, {at: Date.now(), v: out}); json(res, 200, out); }).catch(e => json(res, 502, {error: e.message}));
   }
   if (p === "/api/sheet" && req.method === "GET") return sheetCsv(req, res).catch(e => { console.error("sheet failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/oauth/url" || p === "/oauth/callback") return oauth(req, res, p, url).catch(e => { console.error("oauth failed", e.message); json(res, 500, {error: e.message}); });
