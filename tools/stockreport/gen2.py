@@ -57,7 +57,7 @@ def build_report(m, S, T):
     prior_short = S['prior'].split('（')[0]
     # ---------------- page 1
     p1 = f'''
-<h1 class="big">{t} 本體報告（檔案②）</h1>
+<h1 class="big">{t} 本體報告</h1>
 <p class="subt">{S['zh']}（{S['exch']}）· {S['sector']} · JLaw × MYT 股票分析終極指令 V2.0 · 10 頁硬上限</p>
 <div class="infobox"><b>分析交易日：{DATE_ZH}</b> <span class="pill">正常收市 {DATE}</span> <b>資料截止：</b>{S['asof_full']}　<b>幣別：</b>USD　<b>框架：</b>V2.0<br>
 <b>版本注意：</b>價格唯一來源為 {S['src_note']}（{len(m['closes'])} 根）；{S['shot_note']}，最後一根 K 線 {md()} 為完整收市。上一份＝{S['prev_md']} 行動卡（{prior_short}）{S['prev_note']}<b>{S['ver_note']}</b>九構面分數 ＝ 星數 ÷ 45 × 100（同群組公式一致）。{md()} 收市後消息一律不用。{S['ai_line']}</div>
