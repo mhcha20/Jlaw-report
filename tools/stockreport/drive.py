@@ -30,8 +30,10 @@ def main():
     elif c == 'shots':
         fs = [x for x in ls(a[1]) if x['name'].endswith('.png')]
         nums = sorted(int(x['name'][:2]) for x in fs if re.match(r'\d\d_', x['name']))
-        ok = nums == list(range(1, 18))
-        print(('OK' if ok else 'INCOMPLETE'), len(fs), '張；缺：', sorted(set(range(1, 18)) - set(nums)))
+        etf = any('Fund_' in x['name'] for x in fs)   # ETF 版面：01–05 技術圖＋06–12 Fund_*（共 12 張）
+        need = list(range(1, 13)) if etf else list(range(1, 18))
+        ok = nums == need
+        print(('OK' if ok else 'INCOMPLETE') + (' (ETF 12 張版面)' if etf and ok else ''), len(fs), '張；缺：', sorted(set(need) - set(nums)))
         if ok and len(a) > 2:
             os.makedirs(a[2], exist_ok=True)
             for x in fs:

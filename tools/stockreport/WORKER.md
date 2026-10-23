@@ -18,6 +18,12 @@ python3 drive.py shots <日期資料夾id> /tmp/<TICKER>           # 01–17 齊
 ```
 截圖喺日期資料夾（任務會俾「個股資料夾 id」同「日期資料夾 id」兩個，唔好混）。**唔好用 Drive 嘅文字辨識（部分圖回傳空白或讀錯），要用 Read 工具直接睇圖。** 圖面右下角 UTC 鐘係截圖時間，唔係 K 線時間；盤後價只記錄唔用。
 
+### ETF 版面（例如 XLV、XLK、QQQ、SOXX…）
+ETF 資料夾只有 **12 張**：01 Daily／02 Weekly／03 4H／04 2H（TradingView）＋05 Futubull_Chart_Daily ＋06 Fund_Holdings、07 Fund_Portfolio、08 Fund_AUM、09 Fund_Description、10 Fund_Basic_Info、11 Fund_Dividends、12 Fund_Stock_Splits。`drive.py shots` 見到 `OK (ETF 12 張版面)` 就算齊。處理方式：
+- 九構面仍然全部評分：**基本面**按 ETF 持倉集中度／板塊權重／費用率／AUM 變化判斷（唔係公司財報）；**機構支持**冇 13F／Form 4／分析員評級頁 → 標「N/A（ETF 無此頁）」，該構面用持倉 AUM 資金流向或標 3 星並寫明「缺資料，按中性計」（覆蓋率要如實列出少於 100%）；Minervini／CANSLIM 只做可量度嘅價格趨勢項，C／A／N／S／I 標 N/A。
+- `fund_rows` 改為 ETF 項目（前十大持倉權重、板塊／行業分佈、AUM、費用率、派息、拆股歷史），`smart` 放 AUM／持倉變化；唔好硬套公司財報用語。
+- `prep.py images` 只會裁 Futubull 圖；ETF 圖直接睇原圖或 `_c.png`。
+
 ## 2. 數據
 ```
 python3 prep.py data <TICKER> <DATE>          # （網站 /api/ohlcv 曾回 502，重試一次先算失敗；data 同 images 分開跑，唔好用 && 串）網站 /api/ohlcv（Yahoo 日線）→ data/<TICKER>.json；最後一根要＝DATE
