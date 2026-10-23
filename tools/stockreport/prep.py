@@ -26,6 +26,7 @@ def data(ticker, date, extra=None):
     out = {'closes': [round(x['c'], 4) for x in rows], 'bars': bars, 'symbol': j['symbol']}
     os.makedirs(f'{HERE}/data', exist_ok=True)
     json.dump(out, open(f'{HERE}/data/{ticker}.json', 'w'))
+    json.dump(out, open(f'{HERE}/data/{ticker}_{date}.json', 'w'))   # 每日專屬檔，build.py 優先用
     print(f'{ticker} {j["symbol"]}: {len(rows)} 根，最後 {rows[-1]["d"]} 收 {rows[-1]["c"]} 量 {rows[-1]["v"]:,}')
 
 def images(ticker, folder):

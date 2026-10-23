@@ -2,7 +2,9 @@ import json, os, math
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 def load(t):
-    d = json.load(open(f'{HERE}/data/{t}.json'))
+    jd = os.environ.get('JL_DATE')            # build.py 設定：優先用該日專屬數據檔，避免同一股票兩日同時做互相覆寫
+    p = f'{HERE}/data/{t}_{jd}.json'
+    d = json.load(open(p if jd and os.path.exists(p) else f'{HERE}/data/{t}.json'))
     return d['closes'], d['bars']          # bars: [md,o,h,l,c,vol_k]
 
 def sma(c, k, end=None):

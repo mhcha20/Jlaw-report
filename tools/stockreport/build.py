@@ -10,6 +10,7 @@ import gen
 from gen import *
 from gen2 import *
 t, date, work = sys.argv[1], sys.argv[2], sys.argv[3]
+os.environ['JL_DATE'] = date
 gen.DATE = date
 import gen2; gen2.DATE = date
 y, mo, d = date.split('-'); wd = '一二三四五六日'[__import__('datetime').date(int(y), int(mo), int(d)).weekday()]
