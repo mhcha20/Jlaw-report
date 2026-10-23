@@ -217,6 +217,8 @@ def chips(h):
     return h
 def localize(h, S):
     """按市場（S['ccy']／['cur']…，plan_numbers 設默認）換走寫死嘅美股字眼，唔使每隻 worker 自己後處理"""
+    h = re.sub(r'[（(]檔案[①②③][）)]', '', h)          # 唔再用「檔案①②③」字眼
+    for a, b in (('檔案①', '行動卡'), ('檔案②', '本體報告'), ('檔案③', '核對附錄')): h = h.replace(a, b)
     ccy, cur = S.get('ccy', 'USD'), S.get('cur', '$')
     if ccy != 'USD': h = h.replace('USD', ccy)
     if cur != '$': h = re.sub(r'(?<![A-Za-z])\$(?=\d)', lambda _: cur, h)
