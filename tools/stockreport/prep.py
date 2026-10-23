@@ -19,7 +19,8 @@ def data(ticker, date, extra=None):
     if last and last['d'] == date and not extra and re.fullmatch(r'[A-Z]{1,5}', ticker) and last.get('fa', '9') < date + 'T20:30:00Z':
         raise SystemExit(f'{ticker} {date} 嘅 bar 係盤中（fa={last.get("fa")}）未收市，唔可以用；收市後再跑')
     assert rows and rows[-1]['d'] == date, f'最後一根 K 線 {rows[-1]["d"] if rows else None} ≠ 報告日 {date}（行情未更新？）'
-    assert len(rows) >= 260, f'日線只有 {len(rows)} 根'
+    assert len(rows) >= 60, f'日線只有 {len(rows)} 根'
+    if len(rows) < 260: print(f'⚠ 日線只有 {len(rows)} 根（新上市／短歷史）：MA200 等長週期指標會係 NaN，要標 N/A、52 週高低改用上市以來', file=sys.stderr)
     rows = rows[-319:] if len(rows) > 319 else rows
     bars = [[x['d'][5:], round(x['o'], 4), round(x['h'], 4), round(x['l'], 4), round(x['c'], 4), round(x['v'] / 1000)] for x in rows[-135:]]
     out = {'closes': [round(x['c'], 4) for x in rows], 'bars': bars, 'symbol': j['symbol']}

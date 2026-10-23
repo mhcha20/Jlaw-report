@@ -7,6 +7,7 @@ def load(t):
 
 def sma(c, k, end=None):
     end = len(c) if end is None else end
+    if end < k: return float('nan')       # 日線不足（新上市）：顯式 NaN，唔好靜默算錯
     return sum(c[end-k:end]) / k
 
 def pct(a, b, d=2):                       # a/b-1 in %
@@ -27,7 +28,7 @@ def metrics(t):
     m['close'] = C[-1]; m['prev'] = C[-2]; m['open'] = O[-1]; m['high'] = H[-1]; m['low'] = L[-1]
     m['chg'] = C[-1] - C[-2]; m['chgp'] = pct(C[-1], C[-2])
     m['gap'] = O[-1] - C[-2]; m['gapp'] = pct(O[-1], C[-2]); m['intrap'] = pct(C[-1], O[-1])
-    m['clv'] = (C[-1] - L[-1]) / (H[-1] - L[-1]) * 100
+    m['clv'] = (C[-1] - L[-1]) / (H[-1] - L[-1]) * 100 if H[-1] != L[-1] else 50.0   # 平盤 K 線
     m['vol'] = V[-1]; m['volprev'] = V[-2]
     m['v50'] = sum(V[-51:-1]) / 50; m['v20'] = sum(V[-21:-1]) / 20          # 不含當日（群組口徑）
     m['v50i'] = sum(V[-50:]) / 50; m['v20i'] = sum(V[-20:]) / 20          # 含當日（並列）
