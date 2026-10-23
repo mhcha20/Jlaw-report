@@ -10,13 +10,13 @@ cd <repo> && npm ci --silent                          # signals.js 用 pdfjs-dis
 Playwright／Chromium 已預裝（`/opt/node22/lib/node_modules/playwright`，唔好 `playwright install`）。
 
 ## 1. 取截圖（要齊 17 張，缺就停，回報 `incomplete`）
-1. Drive MCP `search_files`：`parentId = '<日期資料夾 id>'`，pageSize 100，跟 `nextPageToken`。檔名 `01_Daily_TradingView … 17_Futubull_Valuation_PS`。
+1. Drive MCP `search_files`：`parentId = '<日期資料夾 id>'`；**每頁實際只回 5 張（pageSize 唔生效），要一直跟 `nextPageToken` 直到冇為止**，先數到 17 張。檔名 `01_Daily_TradingView … 17_Futubull_Valuation_PS`。
 2. 逐張 `curl -sL -o /tmp/<TICKER>/<檔名> "https://drive.google.com/uc?export=download&id=<fileId>"`（連結分享，免登入）。**唔好用 Drive 嘅文字辨識（部分圖回傳空白或讀錯）**，要用 Read 工具直接睇圖。
 3. 圖面右下角 UTC 鐘係截圖時間，唔係 K 線時間；盤後價只記錄唔用。
 
 ## 2. 數據
 ```
-python3 prep.py data <TICKER> <DATE>          # 網站 /api/ohlcv（Yahoo 日線）→ data/<TICKER>.json；最後一根要＝DATE
+python3 prep.py data <TICKER> <DATE>          # （網站 /api/ohlcv 曾回 502，重試一次先算失敗；data 同 images 分開跑，唔好用 && 串）網站 /api/ohlcv（Yahoo 日線）→ data/<TICKER>.json；最後一根要＝DATE
 python3 prep.py images <TICKER> /tmp/<TICKER>  # 裁切 Futubull 圖：*_c.png（主畫面）、06–09 另有 *_t.png（標籤欄＋最近 6 季，字夠大）
 ```
 Yahoo 成交量同 Longbridge／TradingView 有時唔同（例：NVDA 2026-09-21 Yahoo 109.8M vs Longbridge 161.3M）；**多來源並列，唔平均**。圖面 MA（TradingView）同重算 SMA 要一致到兩位小數，否則先查（復權、時段）。
@@ -35,8 +35,11 @@ Yahoo 成交量同 Longbridge／TradingView 有時唔同（例：NVDA 2026-09-21
 - 朗讀稿：3 分鐘 ≤950 字、完整 ≤3,500 字；口語廣東話；數字寫成適合朗讀（`examples/texts_NVDA.py` 有 `zh()`）。
 - 唔好用 `+`／`-` 表示升跌，用 `▲`／`▼`（build 會後處理 `+x%`／`-x%`）。
 
+## 4b. 篇幅（本體 ≤10 頁，好易爆）
+`fund_rows` 最多 8 行、`risk` 每項 ≤1 行、`pattern_notes` ≤2 條、`smart` 放附錄（唔放本體）。`S['prior']` 字串入面如有括號，第一段（括號前）係評等分數，其餘放最後。`prior` 讀唔到 PDF 時用 `/api/signals` 嘅 rows／history 欄位，並喺附錄第三節註明。
+
 ## 5. 覆核（必做）
-把報告內所有寫死嘅數字（價、量比、距離、R 值、基本面算術、日期序列）用原始數據獨立重算一次（見 `examples/qa_example.py`），失敗就改文字；更正項數寫入行動卡第 7 格同附錄第四節（`corr`、`corr_html`）。
+把報告內所有寫死嘅數字（價、量比、距離、R 值、基本面算術、日期序列）用原始數據獨立重算一次（見 `examples/qa_example.py`），失敗就改文字；更正項數寫入行動卡第 7 格同附錄第四節（`corr`、`corr_html`）；`NQ`（覆核數字個數）要等於 QA 檔實際檢查數，「另有 N 項對照差異」要等於附錄第三節實際並列數，唔好照抄範例。
 
 ## 6. 出 PDF、測試、上載
 ```
