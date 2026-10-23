@@ -41,6 +41,7 @@ def main():
                 with urllib.request.urlopen(f'https://drive.google.com/uc?export=download&id={x["id"]}', timeout=120) as r: open(f'{a[2]}/{x["name"]}', 'wb').write(r.read())
             print('downloaded →', a[2])
     elif c == 'reports':
+        if len(a) < 3: sys.exit('用法：drive.py reports <TICKER> <YYYY-MM-DD>')
         for r in get('/api/sync')['rows']:
             if r[2].startswith(f'{a[2]}_{a[1]}_'): print(r[0], r[1], r[2], r[3])
     elif c == 'latest':

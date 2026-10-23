@@ -29,7 +29,7 @@ function parseCard(raw, fallbackDate) {
   r.date = (t.match(/分析交易日\s*(\d{4}-\d{2}-\d{2})/) || t.match(/行動卡\s*[·｜|]?\s*(\d{4}-\d{2}-\d{2})/) || t.match(/(\d{4}-\d{2}-\d{2})\s*收市/) || [])[1]
     || (ymd ? `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}` : "") || fallbackDate || "";
   const title = t.slice(0, 80);
-  r.titleTicker = (title.match(/^\s*([A-Z]{1,5})\b/) || [])[1] || "";
+  r.titleTicker = (title.match(/^\s*([A-Z]{1,5}|\d{4,6})\b/) || [])[1] || "";
 
   const s1 = between(t, /1[】\s]*評等/, /2[】\s]*今日動作/);
   const s2 = between(t, /2[】\s]*今日動作/, /3[】\s]*三條價位/);
