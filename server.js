@@ -387,6 +387,21 @@ http.createServer(async (req, res) => {
     if (hit && Date.now() - hit.at < 30 * 60 * 1000) return json(res, 200, hit.v);
     return priceLib.fetchOhlcv(t, range).then(v => { const out = {ticker: t, symbol: v.symbol, rows: range === "2y" ? mergeOhlcv(t, v.rows) : v.rows, at: new Date().toISOString()}; ohlcvCache.set(k, {at: Date.now(), v: out}); json(res, 200, out); }).catch(e => json(res, 502, {error: e.message}));
   }
+  if (p === "/api/drive/ls" && req.method === "GET") {   // 公開唯讀：列出連結分享資料夾嘅子項（用 DRIVE_API_KEY），俾排程 worker 唔使 Drive 連接器都可以數截圖
+    const fid = url.searchParams.get("folder") || "";
+    if (!KEY) return json(res, 503, {error: "DRIVE_API_KEY not set"});
+    if (!/^[\w-]{10,60}$/.test(fid)) return json(res, 400, {error: "bad folder id"});
+    return (async () => {
+      const out = []; let tok = "";
+      for (let i = 0; i < 20; i++) {
+        const q = new URLSearchParams({q: `'${fid}' in parents and trashed=false`, fields: "nextPageToken,files(id,name,mimeType,createdTime,size)", pageSize: "1000", key: KEY, orderBy: "name"}); if (tok) q.set("pageToken", tok);
+        const r = await fetch("https://www.googleapis.com/drive/v3/files?" + q), j = await r.json();
+        if (!r.ok) throw new Error((j.error && j.error.message) || ("drive " + r.status));
+        out.push(...(j.files || [])); tok = j.nextPageToken || ""; if (!tok) break;
+      }
+      json(res, 200, {folder: fid, files: out});
+    })().catch(e => json(res, 502, {error: e.message}));
+  }
   if (p === "/api/sheet" && req.method === "GET") return sheetCsv(req, res).catch(e => { console.error("sheet failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/oauth/url" || p === "/oauth/callback") return oauth(req, res, p, url).catch(e => { console.error("oauth failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/hidden" || p === "/api/auth" || p === "/api/hide" || p === "/api/delete") return admin(req, res, p).catch(e => { console.error("admin failed", e.message); json(res, 500, {error: e.message}); });
