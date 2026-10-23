@@ -80,3 +80,11 @@ python3 drive.py reports <TICKER> <DATE>      # 上載前後都查：同 ticker 
 
 ## 7. 回報（最後一行，JSON）
 `{"ticker","date","mode","status":"done|incomplete|failed","rating","score","tier","pages":{…},"corrections":N,"notes":"…"}`
+
+## 實測補充（10/21 演練回饋）
+- **新上市股（日線 <260 根）**：`prep.py data` 會因 assert 失敗；改用 `/api/ohlcv` 自行寫 `data/<T>.json`，MA200 標 N/A，52 週高低改用上市以來高低，Minervini／第二階段涉及 MA200 嘅項目標 N/A。
+- **Longbridge `finance_calendar` 嘅 symbols 篩選無效**（回傳 1.2MB 全市場），唔好用；財報日期攞唔到就標「未公布」。
+- **ETF**：`gen2.build_report` 內「覆蓋率 100%」「最近一季」字眼唔啱 ETF，要喺 work 檔替換；機構支持標 N/A 按中性 3 星並列為未決問題。ETF 派息多，Futubull 圖面疑為前復權，長週期均線／52 週高低同不復權價有差，並列唔採用。
+- QA 容差要細過最後一位；顯示捨入邊界（x.xx5）要跟 TradingView 圖面。
+- Futubull 圖偶有孤立 K 線／4H RSI 同日線一樣，視為顯示異常，只並列唔採用。
+- `from lib import *` 會覆蓋 `HERE`，QA 檔自己嘅路徑另起名。
