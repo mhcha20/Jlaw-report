@@ -75,7 +75,7 @@ node sigtest.js out/<DATE>_<TICKER>_行動卡.pdf                # 要見到 dat
 ```
 python3 drive.py upload out/<檔名>.pdf        # 檔名＝YYYY-MM-DD_TICKER_行動卡.pdf／…_股票分析終極報告.pdf／…_核對附錄.pdf，cat=auto
 python3 drive.py reports <TICKER> <DATE>      # 上載前後都查：同 ticker 同日同類型已有舊檔嘅 id
-python3 drive.py trash <舊檔id> …              # 上載成功後將同名舊檔放入垃圾桶（用戶已授權刪舊版；可還原）
+# 上載已帶 replace=1：伺服器會自動將同資料夾同名舊檔放入垃圾桶（用戶已授權；可還原）。`drive.py trash` 喺排程 session 會 401（管理員 header 只喺上載路徑注入），唔好用；上載回應 `replaced` 列出被放入垃圾桶嘅舊檔 id。
 ```
 
 ## 7. 回報（最後一行，JSON）

@@ -172,7 +172,17 @@ async function upload(req, res, url) {
   // 令 PDF 可經連結查看（與現有報告一致），失敗唔影響上傳
   try { await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}/permissions?supportsAllDrives=true`, {method: "POST", headers: {Authorization: "Bearer " + tok, "Content-Type": "application/json"}, body: JSON.stringify({role: "reader", type: "anyone"})}); } catch (e) {}
   known.add(f.id); cache = null;
-  json(res, 200, {row: [cat, f.id, f.name.replace(/\.pdf$/i, ""), f.createdTime, Number(f.size) || buf.length]});
+  // replace=1：上載成功後，將同一資料夾內同名嘅舊檔放入垃圾桶（排程 worker 冇 Drive 連接器／管理員 header 只喺上載路徑生效，所以喺呢度做；垃圾桶可還原）
+  const replaced = [];
+  if (url.searchParams.get("replace") === "1") {
+    try {
+      const q = new URLSearchParams({q: `name = '${name.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}' and '${FOLDER_BY_CAT[cat]}' in parents and trashed = false`, fields: "files(id)", supportsAllDrives: "true", includeItemsFromAllDrives: "true"});
+      const lr = await fetch("https://www.googleapis.com/drive/v3/files?" + q, {headers: {Authorization: "Bearer " + tok}});
+      if (lr.ok) for (const o of (await lr.json()).files || []) if (o.id !== f.id) { try { await trash(o.id); vis.deleted.add(o.id); known.delete(o.id); replaced.push(o.id); } catch (e) { console.error("replace trash failed", o.id, e.message); } }
+      if (replaced.length) saveVis();
+    } catch (e) { console.error("replace failed", e.message); }
+  }
+  json(res, 200, {row: [cat, f.id, f.name.replace(/\.pdf$/i, ""), f.createdTime, Number(f.size) || buf.length], replaced});
 }
 async function oauth(req, res, p, url) {
   if (p === "/api/oauth/url") {

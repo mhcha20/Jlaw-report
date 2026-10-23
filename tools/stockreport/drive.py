@@ -9,7 +9,7 @@
   drive.py market                             最近一份大盤報告 id／名
   drive.py pdf <id> <out.pdf>                 下載網站報告 PDF
   drive.py trash <id> [<id>…]                 放入 Drive 垃圾桶（要 ADMIN；環境 proxy 自動帶密碼 header）
-  drive.py upload <file.pdf>                  上載（檔名要符合 YYYY-MM-DD_TICKER_類型.pdf；cat=auto）
+  drive.py upload <file.pdf>                  上載（檔名要符合 YYYY-MM-DD_TICKER_類型.pdf；cat=auto；replace=1＝上載後自動將同資料夾同名舊檔放入垃圾桶）
 """
 import json, os, re, sys, urllib.parse, urllib.request
 SITE = os.environ.get('JLAW_SITE', 'https://jlaw-report-a74806.up.railway.app')
@@ -53,6 +53,6 @@ def main():
         with urllib.request.urlopen(f'{SITE}/pdf/{a[1]}', timeout=120) as r: open(a[2], 'wb').write(r.read()); print('saved', a[2])
     elif c == 'trash': print(json.dumps(post('/api/delete', json.dumps({'ids': a[1:]}).encode()), ensure_ascii=False)[:400])
     elif c == 'upload':
-        f = a[1]; print(json.dumps(post('/api/upload?name=' + urllib.parse.quote(os.path.basename(f)) + '&cat=auto', open(f, 'rb').read(), 'application/pdf'), ensure_ascii=False))
+        f = a[1]; print(json.dumps(post('/api/upload?name=' + urllib.parse.quote(os.path.basename(f)) + '&cat=auto&replace=1', open(f, 'rb').read(), 'application/pdf'), ensure_ascii=False))
     else: print(__doc__)
 if __name__ == '__main__': main()
