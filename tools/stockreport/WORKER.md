@@ -10,9 +10,13 @@ cd <repo> && npm ci --silent                          # signals.js 用 pdfjs-dis
 Playwright／Chromium 已預裝（`/opt/node22/lib/node_modules/playwright`，唔好 `playwright install`）。
 
 ## 1. 取截圖（要齊 17 張，缺就停，回報 `incomplete`）
-1. Drive MCP `search_files`：`parentId = '<日期資料夾 id>'`；**每頁實際只回 5 張（pageSize 唔生效），要一直跟 `nextPageToken` 直到冇為止**，先數到 17 張。檔名 `01_Daily_TradingView … 17_Futubull_Valuation_PS`。
-2. 逐張 `curl -sL -o /tmp/<TICKER>/<檔名> "https://drive.google.com/uc?export=download&id=<fileId>"`（連結分享，免登入）。**唔好用 Drive 嘅文字辨識（部分圖回傳空白或讀錯）**，要用 Read 工具直接睇圖。
-3. 圖面右下角 UTC 鐘係截圖時間，唔係 K 線時間；盤後價只記錄唔用。
+排程 session **冇 Drive 連接器**，一律用 `drive.py`（經網站 API；有連接器都照用呢套，結果一樣）：
+```
+python3 drive.py tickerfolder <TICKER>                      # 個股資料夾 id（重點股 id 已喺任務俾咗）
+python3 drive.py datefolder <個股資料夾id> "22 oct 2026"      # 日期資料夾 id（月份三個小寫字母）
+python3 drive.py shots <日期資料夾id> /tmp/<TICKER>           # 01–17 齊先下載；唔齊印 INCOMPLETE＋缺邊啲
+```
+截圖喺日期資料夾（任務會俾「個股資料夾 id」同「日期資料夾 id」兩個，唔好混）。**唔好用 Drive 嘅文字辨識（部分圖回傳空白或讀錯），要用 Read 工具直接睇圖。** 圖面右下角 UTC 鐘係截圖時間，唔係 K 線時間；盤後價只記錄唔用。
 
 ## 2. 數據
 ```
@@ -33,7 +37,7 @@ Yahoo 成交量同 Longbridge／TradingView 有時唔同（例：NVDA 2026-09-21
 - 九構面＝趨勢、成交量、圖形、Momentum、基本面、市場配合、機構支持、Pullback、Breakout，星 1–5，分數＝星數÷45×100。
 - 回踩路徑（機械式入場區）＋順勢路徑；R1–R4；止損％÷入場價、距離％÷現價；R4 四項測試（大市／第二階段／RRR≥2／雜訊被掃率＜30%，被掃率由 `plan_numbers` 按群組定義計）。
 - 紀律十條（`docs/jlaw-myt-stock-prompt-v2.md`）：收市價為準、同一事實只計一次、多來源並列不調和、承襲門檻不自行改、Form 4 唔直接當看淡、突破成功率冇樣本一律 N/A。
-- 大盤／板塊背景：美股引用當日我哋嘅大盤報告（Drive 大盤分析資料夾）；港股、日股冇大盤報告就只用圖面指數同當日板塊，並註明。群組大盤執行規則（半倉上限等）未提供就唔套用。
+- 大盤／板塊背景：美股引用最近一份我哋嘅大盤報告（`python3 drive.py market` 列出，`drive.py pdf` 下載）；港股、日股冇大盤報告就只用圖面指數同當日板塊，並註明。群組大盤執行規則（半倉上限等）未提供就唔套用。
 - 上一份：Drive 同股票最近一份行動卡／報告（用 `read_file_content` 或下載 PDF 再 `pdftotext`）；對比價位前先核對佢嘅日期同收市價係咪真係屬於該交易日（曾發現 10/20 卡其實用 10/19 收市）。
 - **今日動作（≤40 字）**要寫成「未持倉：…。已持倉：續抱，按警報價處理。」——已持倉**唔好出現「減倉／離場／清倉」字眼**（`signals.js` 會機械歸類成賣出訊號）；`signals.js` 對 flat 嘅歸類字眼：「零新倉／零倉／不買／觀望／保持觀望／唔入場」→零新倉；「低吸／吸納／分批／建倉／買入／入場／開倉／加碼」→條件式建倉（會變買入訊號！）；其他（例如只寫「等」）→觀望。價位只放第 3、5 格（`買入觸發 227.00 ▲2.27%`、`減倉 212.77 ▼4.14%`、`離場 203.00 ▼8.55%`、`227.00 要升 2.27% …`）。
 - 朗讀稿：3 分鐘 ≤950 字、完整 ≤3,500 字；口語廣東話；數字寫成適合朗讀（`examples/texts_NVDA.py` 有 `zh()`）。
@@ -53,9 +57,10 @@ node sigtest.js out/<DATE>_<TICKER>_行動卡.pdf                # 要見到 dat
 ```
 上載（`ADMIN_PASSWORD` 由環境 proxy 自動帶 header，唔使寫密碼）：
 ```
-curl -sS -X POST "https://jlaw-report-a74806.up.railway.app/api/upload?name=<URL 編碼檔名.pdf>&cat=auto" -H "Content-Type: application/pdf" --data-binary @out/<檔名>.pdf
+python3 drive.py upload out/<檔名>.pdf        # 檔名＝YYYY-MM-DD_TICKER_行動卡.pdf／…_股票分析終極報告.pdf／…_核對附錄.pdf，cat=auto
+python3 drive.py reports <TICKER> <DATE>      # 上載前後都查：同 ticker 同日同類型已有舊檔嘅 id
+python3 drive.py trash <舊檔id> …              # 上載成功後將同名舊檔放入垃圾桶（用戶已授權刪舊版；可還原）
 ```
-檔名＝`YYYY-MM-DD_TICKER_行動卡.pdf`／`…_股票分析終極報告.pdf`／`…_核對附錄.pdf`。上載前用 Drive `search_files` 搵同 ticker 同日同類型嘅舊檔，上載成功後用 `trash_file` 放入垃圾桶（用戶已授權刪舊版；Drive 垃圾桶可還原）。
 
 ## 7. 回報（最後一行，JSON）
 `{"ticker","date","mode","status":"done|incomplete|failed","rating","score","tier","pages":{…},"corrections":N,"notes":"…"}`
