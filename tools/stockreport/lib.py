@@ -223,6 +223,11 @@ def localize(h, S):
     for a, b in (('檔案①', '行動卡'), ('檔案②', '本體報告'), ('檔案③', '核對附錄')): h = h.replace(a, b)
     h = re.sub(r'<span class="(?:up|dn)">[▲▼]nan%</span>', 'N/A', h)    # 新上市股：日線唔夠長嘅指標顯示 N/A，唔好出 nan
     h = re.sub(r'(?<![A-Za-z])nan(?![A-Za-z])', 'N/A', h)
+    if S.get('prior_same'):     # 上一份係我哋自己同一套九構面計法 → 可直接比較升降（S['prior_same']=True）
+        h = re.sub(r'分數由本份重新起算，唔可以同其他股票或上一份 (.*?) 直接比較。', r'分數唔可以同其他股票比較；同上一份 \1 係同一九構面計法，可直接比較升降。', h)
+        h = h.replace('；計法不同，唔作升降', '；同一九構面計法，可直接比較升降')
+        h = h.replace('（評分表未提供，無法逐格比較，唔當升降）', '（同一九構面計法，可直接比較升降）')
+        h = h.replace('本份係首份，九構面全部重新起算，所以每格都寫理由', '九構面全部按當日數據重新評分，每格都寫理由')
     ccy, cur = S.get('ccy', 'USD'), S.get('cur', '$')
     if ccy != 'USD': h = h.replace('USD', ccy)
     if cur != '$': h = re.sub(r'(?<![A-Za-z])\$(?=\d)', lambda _: cur, h)
