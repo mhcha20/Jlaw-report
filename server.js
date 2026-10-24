@@ -172,7 +172,7 @@ async function upload(req, res, url) {
   const f = await r.json();
   // 令 PDF 可經連結查看（與現有報告一致），失敗唔影響上傳；J Law 觀點係私人材料，唔開分享
   if (cat !== "jlaw") try { await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}/permissions?supportsAllDrives=true`, {method: "POST", headers: {Authorization: "Bearer " + tok, "Content-Type": "application/json"}, body: JSON.stringify({role: "reader", type: "anyone"})}); } catch (e) {}
-  known.add(f.id); cache = null;
+  if (cat !== "jlaw") { known.add(f.id); cache = null; }   // J Law 私人檔唔入公開 /pdf 白名單
   // replace=1：上載成功後，將同一資料夾內同名嘅舊檔放入垃圾桶（排程 worker 冇 Drive 連接器／管理員 header 只喺上載路徑生效，所以喺呢度做；垃圾桶可還原）
   const replaced = [];
   if (url.searchParams.get("replace") === "1") {
