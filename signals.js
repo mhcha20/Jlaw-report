@@ -19,8 +19,17 @@ const num = s => Number(String(s).replace(/,/g, ""));
 const between = (t, a, b) => { const i = t.search(a); if (i < 0) return ""; const rest = t.slice(i); const j = b ? rest.slice(1).search(b) : -1; return j < 0 ? rest : rest.slice(0, j + 1); };
 const trim = (s, n) => { s = (s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
 
-const VERSION = 4;   // 解析規則版本：改咗解析規則就加 1，伺服器會用新規則重讀所有舊卡
+const VERSION = 5;   // 解析規則版本：改咗解析規則就加 1，伺服器會用新規則重讀所有舊卡
 const RATING = "(?:強烈)?買入|值得買入|觀察|觀望[/／]?中性|觀望|持有[/／]?觀望|持有|減持|賣出|迴避|中立|不建議|強烈避免|避免交易|偏弱|轉弱[/／]?暫避";
+// 識別本站 V2.0 生成器（tools/stockreport）出嘅卡：明確標記「JLaw V2.0 生成器」；或者舊版冇標記時三個字眼齊全
+// （第 5 格「三個警報價（可入 TradingView）」＋「口徑：距離一律 ÷ 現價」＋頁首「框架 JLaw × MYT V2.0」）。
+// 主流程卡亦有「框架 JLaw × MYT V2.0」，但警報格寫法唔同、冇「口徑」句，所以單一字眼唔算。
+function genOf(t) {
+  const z = t.replace(/\s+/g, "");
+  if (/JLawV2\.0生成器/.test(z)) return "v2";
+  const hits = [/三個警報價[（(]可入TradingView[）)]/, /口徑[：:]距離一律÷現價/, /框架JLaw×MYTV2\.0/].filter(re => re.test(z)).length;
+  return hits === 3 ? "v2" : "";
+}
 function parseCard(raw, fallbackDate) {
   // V2.1 版面用咗康熙部首／相容字（⾏、⽇、∕），先轉返一般字
   const t = raw.replace(/[\u2E80-\u2FDF\uF900-\uFAFF]/g, c => c.normalize("NFKC")).replace(/∕/g, "/").replace(/[ \t]*\n[ \t]*/g, " ").replace(/\s{2,}/g, " ");
@@ -28,6 +37,7 @@ function parseCard(raw, fallbackDate) {
   const ymd = t.match(/交易日[：:]?\s*(\d{4})年(\d{1,2})月(\d{1,2})日/);
   r.date = (t.match(/分析交易日\s*(\d{4}-\d{2}-\d{2})/) || t.match(/行動卡\s*[·｜|]?\s*(\d{4}-\d{2}-\d{2})/) || t.match(/(\d{4}-\d{2}-\d{2})\s*收市/) || [])[1]
     || (ymd ? `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}` : "") || fallbackDate || "";
+  r.gen = genOf(t) || undefined;
   const title = t.slice(0, 80);
   r.titleTicker = (title.match(/^\s*([A-Z]{1,5}|\d{4,6})\b/) || [])[1] || "";
 
@@ -170,7 +180,7 @@ function buildHistory(cards) {
     const list = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(e => ({...e[1], date: e[0], cls: classify(e[1])}));
     out[t] = list.map((c, i) => {
       const d = i ? diffCards(list[i - 1], c) : {tag: null, changes: []};
-      return {date: c.date, id: c.id, stars: c.stars, rating: c.rating, score: c.score, flat: c.cls.flat, held: c.cls.held, gates: c.gates,
+      return {date: c.date, id: c.id, gen: c.gen || "", stars: c.stars, rating: c.rating, score: c.score, flat: c.cls.flat, held: c.cls.held, gates: c.gates,
         close: typeof c.close === "number" ? c.close : null, buy: c.levels && c.levels.buy ? c.levels.buy.price : null, stop: c.levels && c.levels.stop ? c.levels.stop.price : null, market: c.market, first: i === 0, tag: d.tag, changes: d.changes};
     });
   }
@@ -234,4 +244,4 @@ function backtest(list, prices = [], start = 100) {
     bh: firstFill && lastBar && lastBar.d > firstFill.d ? lastBar.c / firstFill.o - 1 : null, from: list.length ? list[0].date : "", to: lastBar ? lastBar.d : ""};
 }
 
-module.exports = {VERSION, tradingDate, pdfText, parseCard, classify, diffCards, buildHistory, backtest};
+module.exports = {VERSION, genOf, tradingDate, pdfText, parseCard, classify, diffCards, buildHistory, backtest};

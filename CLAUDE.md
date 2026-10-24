@@ -19,12 +19,14 @@
 - `server.js`：`GET /api/signals`（**公開唯讀**；`?refresh=1` 重新分析需密碼）背景處理**所有日子**嘅行動卡（每股每日只取最新上傳），每份解析結果永久存 `/data/signals.json`（Drive 檔案日後被刪，歷史仍保留）；已處理過嘅卡唔會重讀（除非 Drive 檔案大小變咗＝原檔被改，或 `signals.js` 嘅 `VERSION` 升版，會用新解析規則重讀全部；改解析規則記得加 `VERSION`）；伺服器每 30 分鐘自動更新一次。`signals.js` 嘅 `diffCards()`／`buildHistory()` 逐日比較，標示 🟢買入訊號（未持倉轉條件式建倉／三閘全過、評等轉買入）同 🔴賣出訊號（已持倉轉減倉／離場、評等跌出買入），並記錄分數、閘、價位、大盤嘅每日變化。`backtest()` 做「每隻 $100」模擬：**訊號喺行動卡日期收市後先出 → 下一個交易日開市價成交**（買入訊號買、賣出訊號全數賣），複利滾存；唔計手續費、滑點；同日買賣並存持倉當賣、未持倉唔買；起始日已係買入狀態亦當買入訊號；持倉中按最新收市價計；下一個交易日未有行情則顯示「待成交」。開市價由 `prices.js` 讀 Yahoo Finance 日線（Stooq 後備；代號對應：字母＝美股、5 位數字＝港股 `.HK`、6 位數字＝韓股 `.KS`、4 位數字＝日股 `.T`／0 開頭港股；NESN、SCHN 歐洲 `.SW`、MC 巴黎 `.PA`、ATD 加拿大 `.TO` 喺 `prices.js` 嘅 `OVERRIDE` 同 `index.html` 嘅 `MKT_OVERRIDE` 手動指定，新增非美股字母代號要兩邊一齊加），存 `/data/prices.json`，每 3 小時更新；攞唔到行情時回測顯示「未攞到行情」而唔會亂計。結果喺 `/api/signals` 嘅 `bt`／`px`，網頁「💰 回測」視圖顯示每筆買賣嘅出訊號日、成交日同價位。網頁喺分析期間每 3 秒輪詢。
 - 卡內「分析交易日」若係週六日（例如 10-17 批其實係 10-16 收市），`buildHistory()` 用 `tradingDate()` 退返上一個交易日。
 - 行動卡版面變更時要更新 `signals.js` 嘅解析規則（以 `2 今日動作`、`3 三條價位` 等格標題切段）。真實卡文字屬內部資料，測試用文本放 scratchpad，唔好提交入 repo。
+- **V2.0 生成器卡標記**：`parseCard()` 嘅 `gen`（`genOf()`）＝`"v2"` 代表本站 `tools/stockreport` 出嘅卡；規則：有「JLaw V2.0 生成器」（`gen.py build_card` 頁尾細字，2026-10-24 起）即係，否則要三個字眼齊全（第 5 格「三個警報價（可入 TradingView）」＋「口徑：距離一律 ÷ 現價」＋「框架 JLaw × MYT V2.0」；主流程卡都有「框架 JLaw × MYT V2.0」，單一字眼唔算）。比對時先刪晒空白（PDF 會斷行）。`buildHistory()` 每日項目同 `/api/signals` rows 都帶 `gen`。用 Drive 459 張卡測過：50 張 V2.0、主流程 409 張零誤判。
 - 未有讀取：個股本體報告、核對附錄。
 
 ## 群友對照（👥 分頁，獨立，唔入訊號／回測）
 - 資料來源：私人 Drive 資料夾「群友報告」`1jAs8B7c3nbQlUbbBisnzZw_X4aHm8lGO`（子資料夾 行動卡_群友／個股研究報告_群友／核實報告_群友），用用戶 Google OAuth token（`userToken()`）讀；簽到表（分頁「個股 research list」欄 C 代號、欄 E 負責人）決定負責人。**簽到只代表認領者，未必係實際製作者**；未簽到歸「未簽到」；全數字代號按數值正規化（66＝00066）。
 - `peers.js`：寬鬆解析行動卡文字（代號、日期、評等、分數＋制式、收市價、成交量、SMA、今日動作摘要）＋`verifyCard()` 對行情核對（容差同 `tools/stockreport/peers.py`）。本體報告／核對附錄只記檔案資訊。改解析規則要升 `PV`。
 - API 全部需 `ADMIN_PASSWORD`（內含群友名）：`GET /api/peers`、`POST /api/peers/refresh`、`GET /api/peers/pdf?id=`（只准該資料夾內嘅檔案）。結果存 `/data/peers.json`，每 6 小時自動更新，size 無變嘅卡唔重讀；行情用 `fetchOhlcv`／`mergeOhlcv`（`/data/ohlcv`）。前端 PDF 用 fetch＋blob 開（要帶密碼 header）。
+- 每隻股票頂部兩行（取自 `/api/signals` 嘅 `history`）：「主流程卡（網站最新）」＝最新一張 `gen≠v2` 嘅卡；「V2.0 重算」＝最新一張 `gen=v2`。同名同日檔被 V2.0 取代嘅日子主流程冇卡，就顯示前一日主流程卡，照實列日期。群友卡旁標「同日比較：…」或「日期唔同（群友 10/16 vs 主流程 10/21）」，日期唔同唔可直接比。
 - 核對只比對行情數字，唔代表分析對錯。
 
 ## 約定

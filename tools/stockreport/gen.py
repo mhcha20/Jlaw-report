@@ -108,6 +108,7 @@ def build_card(m, S, prev):
 <tr><td class="cardn">7</td><td class="lbl">今日更正</td><td>{prev['corr']}</td></tr>
 </tbody></table>
 <div class="notice" style="margin-top:6px">{prev['foot']}</div>
+<div style="margin-top:3px;font-size:7pt;color:#888;text-align:right">JLaw V2.0 生成器</div>
 '''
     return html
 

@@ -328,7 +328,7 @@ function sigPayload() {
     const last = list[list.length - 1], rec = sig.cards[last.id], cls = signals.classify(rec);
     const prevScore = rec.prevScore ?? (list.length > 1 ? list[list.length - 2].score : undefined);
     const lastTag = k => { for (let i = list.length - 1; i >= 0; i--) if (list[i].tag === k || list[i].tag === "mixed") return list[i].date; return ""; };
-    rows.push({ticker, id: rec.id, name: rec.name, date: last.date, up: rec.up, stars: rec.stars, rating: rec.rating, score: rec.score, prevScore, market: rec.market, cap: rec.cap,
+    rows.push({ticker, id: rec.id, name: rec.name, gen: rec.gen || "", date: last.date, up: rec.up, stars: rec.stars, rating: rec.rating, score: rec.score, prevScore, market: rec.market, cap: rec.cap,
       headline: rec.headline, flat: rec.flat, held: rec.held, gates: rec.gates, close: rec.close, levels: rec.levels, alerts: (rec.alerts || []).slice(0, 8), cls,
       lastBuy: lastTag("buy"), lastSell: lastTag("sell"), days: list.length});
     list.forEach(e => { if (e.tag) feed.push({ticker, date: e.date, tag: e.tag, id: e.id, changes: e.changes.filter(c => c.k !== "level" && c.k !== "market").slice(0, 3)}); });

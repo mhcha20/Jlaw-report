@@ -702,7 +702,7 @@ async function loadPeers(force){
     if(r.status === 401){ lock(); throw new Error("密碼錯誤，已退出管理"); }
     if(!r.ok) throw new Error(j.error || r.status);
     pr.data = j;
-    if(!pr.ours) fetch("/api/signals").then(x => x.json()).then(j2 => { pr.ours = j2.rows || []; renderPeer(); }).catch(() => { pr.ours = []; });
+    if(!pr.ours) fetch("/api/signals").then(x => x.json()).then(j2 => { pr.ours = j2.history || {}; renderPeer(); }).catch(() => { pr.ours = {}; });
   } catch(e){ pr.err = e.message; }
   pr.loading = false; renderPeer();
   clearTimeout(pr.timer);
@@ -731,17 +731,31 @@ function peerDetail(f){
   if(f.textDate && f.textDate !== f.date) h += '<div class="mut">檔名日期 ' + esc(f.date) + '，內文日期 ' + esc(f.textDate) + '（核對以檔名日期為準）</div>';
   return h || '<div class="mut">冇更多資料</div>';
 }
-const peerLine = (f, older) => {
+// 本站行動卡：由 /api/signals 嘅 history 揀最新一張主流程卡（gen≠v2）同最新一張 V2.0 生成器卡（gen=v2）
+function ourRefs(list){
+  const r = {}; (list || []).forEach(e => { if(e.gen === "v2") r.v2 = e; else r.main = e; });   // history 已按日期升序
+  return r;
+}
+const mdOf = d => d ? d.slice(5).replace("-", "/") : "";
+const refLine = (lab, e) => '<div>' + lab + '：<b>' + (e.stars ? "★".repeat(e.stars) + " " : "") + esc(e.rating || "—") + (typeof e.score === "number" ? " · " + e.score + " /100" : "") + '</b> · <span style="white-space:nowrap">' + esc(e.date) + '</span></div>';
+const sameDayTag = (f, ref) => {   // 群友卡同本站卡日期唔同就唔好暗示可以直接比
+  const ds = [["主流程", ref.main], ["V2.0", ref.v2]].filter(x => x[1]);
+  if(!ds.length || !f.date) return "";
+  const same = ds.filter(x => x[1].date === f.date), diff = ds.filter(x => x[1].date !== f.date);
+  return (same.length ? '<span class="bd ok">同日比較：' + same.map(x => x[0]).join("、") + '</span>' : "") +
+    (diff.length ? '<span class="bd diff">日期唔同（群友 ' + mdOf(f.date) + ' vs ' + diff.map(x => x[0] + " " + mdOf(x[1].date)).join("、") + '）</span>' : "");
+};
+const peerLine = (f, ref) => {
   const p = f.parsed || {}, scoreTxt = typeof p.score === "number" ? p.score + " " + esc(p.scoreScale || "") : "";
   return '<div class="pr"><div><span class="own">' + esc(f.signed ? f.owner : "未簽到") + '</span> <span class="mut">' + esc(f.date || "冇日期") + '</span> · ' +
-    (p.stars ? "★".repeat(p.stars) + " " : "") + esc(p.rating || (f.image || f.err ? "" : "—")) + (scoreTxt ? " · " + scoreTxt : "") + '</div><div>' + peerBadges(f) + '</div>' +
+    (p.stars ? "★".repeat(p.stars) + " " : "") + esc(p.rating || (f.image || f.err ? "" : "—")) + (scoreTxt ? " · " + scoreTxt : "") + '</div>' + (ref ? '<div>' + sameDayTag(f, ref) + '</div>' : '') + '<div>' + peerBadges(f) + '</div>' +
     '<div><a class="pdf" href="#" data-pdf="' + esc(f.id) + '">📄 PDF</a>' + (!f.image && !f.err ? '<button class="lnk" data-pd="' + esc(f.id) + '">' + (pr.open.has(f.id) ? "▲ 收起" : "▼ 今日動作／核對明細") + '</button>' : '') + '</div>' +
     (pr.open.has(f.id) ? peerDetail(f) : "") + '</div>';
 };
 const verdictOf = f => f.v ? f.v.verdict : "unk";
 function renderPeer(){
   const el = $("#peer"); if(state.cat !== "peer") return;
-  const note = '<div class="warnbox">⚠ 負責人＝簽到認領者，未必係實際製作者；核對只比對行情數字，唔代表分析對錯；唔入買賣訊號。</div>';
+  const note = '<div class="warnbox">⚠ 負責人＝簽到認領者，未必係實際製作者；核對只比對行情數字，唔代表分析對錯；唔入買賣訊號。<br>主流程卡由另一條流程出，評級普遍偏高；V2.0 重算由本站生成器按日線重算；三者日期唔同時唔可直接比較。</div>';
   if(pr.err){ el.innerHTML = note + '<p class="note">⚠ ' + esc(pr.err) + '</p><button class="sm" id="prRetry">重試</button>'; $("#prRetry").onclick = () => loadPeers(false); return; }
   if(!pr.data){ el.innerHTML = note + '<p class="note">讀取中…</p>'; return; }
   const d = pr.data, st = d.state || {}, all = d.files.filter(f => mktOk(mktOf(f.ticker, f.name)));
@@ -763,16 +777,16 @@ function renderPeer(){
       '<div class="note">核對 ✓＝收市價／均線／成交量冇 ⚠（來源差異當 ✓）；攞唔到行情、圖像檔、抽唔到數字嘅唔計；少過 5 份標「樣本少」。「按人」嘅人名來自簽到表，只代表認領者。</div>';
   } else {
     const by = {}; all.forEach(f => { if(f.key) (by[f.key] ||= []).push(f); });
-    const ours = {}; (pr.ours || []).forEach(r => { ours[tkKey(r.ticker)] = r; });
+    const ours = {}; Object.entries(pr.ours || {}).forEach(([t, l]) => { ours[tkKey(t)] = ourRefs(l); });
     const groups = Object.entries(by).map(([k, l]) => ({k, l, tk:(l.find(f => f.kind === "card") || l[0]).ticker, cards:l.filter(f => f.kind === "card"), others:l.filter(f => f.kind !== "card")}))
       .filter(g => !q || g.tk.toLowerCase().includes(q) || g.l.some(f => (f.signed ? f.owner : "未簽到").toLowerCase().includes(q)))
       .sort((a, b) => ((b.cards.map(f => f.date).sort().pop()) || "").localeCompare((a.cards.map(f => f.date).sort().pop()) || "") || a.tk.localeCompare(b.tk));
     h += groups.map(g => {
-      const o = ours[g.k], byOwner = {};
+      const o = ours[g.k] || {}, byOwner = {};
       g.cards.slice().sort((a, b) => b.date.localeCompare(a.date) || b.mt.localeCompare(a.mt)).forEach(f => { (byOwner[f.signed ? f.owner : "未簽到"] ||= []).push(f); });
       return '<div class="pc"><span class="tk">' + esc(g.tk) + '</span>' +
-        '<div class="our">我哋：' + (o ? '<b>' + (o.stars ? "★".repeat(o.stars) + " " : "") + esc(o.rating || "—") + (typeof o.score === "number" ? " · " + o.score + " /100" : "") + '</b> · ' + esc(o.date) : (pr.ours ? "未有行動卡" : "讀取中…")) + '</div>' +
-        (Object.values(byOwner).map(l => peerLine(l[0]) + (l.length > 1 ? '<div class="mut">較舊 ' + (l.length - 1) + ' 份：' + l.slice(1).map(f => '<a href="#" data-pdf="' + esc(f.id) + '">' + esc(f.date || "冇日期") + '</a>').join("、") + '</div>' : "")).join("") || '<div class="mut">暫時冇群友行動卡</div>') +
+        '<div class="our">' + (o.main || o.v2 ? (o.main ? refLine("主流程卡（網站最新）", o.main) : "") + (o.v2 ? refLine("V2.0 重算", o.v2) : "") : (pr.ours ? "本站未有行動卡" : "讀取中…")) + '</div>' +
+        (Object.values(byOwner).map(l => peerLine(l[0], o) + (l.length > 1 ? '<div class="mut">較舊 ' + (l.length - 1) + ' 份：' + l.slice(1).map(f => '<a href="#" data-pdf="' + esc(f.id) + '">' + esc(f.date || "冇日期") + '</a>').join("、") + '</div>' : "")).join("") || '<div class="mut">暫時冇群友行動卡</div>') +
         (g.others.length ? '<div class="mut" style="margin-top:4px">其他檔案：' + g.others.map(f => '<a href="#" data-pdf="' + esc(f.id) + '">' + ({stock:"本體報告", verify:"核對附錄"}[f.kind] || "其他") + " " + esc(f.date || "") + '</a>').join("、") + '</div>' : '') + '</div>';
     }).join("") || '<p class="note">冇資料。' + (st.running ? "" : "撳「重新掃描」讀取群友報告資料夾。") + '</p>';
     h += '<div class="note">每位負責人只顯示該股最新一份行動卡。收市價 ✓＝同行情收市價相符（容差 0.02 或 0.05%）；落後一日＝卡內收市價等於前一交易日收市；均線＝SMA 對行情重算（容差 0.05%）；成交量 ✓ ≤0.5%、來源差異 ≤3%、⚠ >3%；？＝攞唔到行情。</div>';
