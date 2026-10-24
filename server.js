@@ -145,6 +145,7 @@ const redirectUri = req => `${(req.headers["x-forwarded-proto"] || "http").split
 const FOLDER_BY_CAT = {
   card: "1k0bxCss7lazu5Ozq6FX1oKUt-qbv5ZtU", stock: "1kIGilWMZYxBvfBpKbxOTVE8kJ4a_MnEb", verify: "1uVDlxdVLhrA6PWB-EsR5wRcPPskXTAog",
   market: "18yWn2hUykKaKru44HavWutfUST9Dux6_", daily: "1AeIL4vlhY5dqij_wtIF9paB0-cadqowE",
+  jlaw: "1FDeIf6L0B4ZgVeqAl6cWQEcBo5Gu18jQ",   // J Law 觀點（私人，唔開連結分享；只經 jlawOp 讀）
 };
 const detectCat = n => /每日跨股總表/.test(n) ? "daily" : /大盤/.test(n) ? "market" : /行動卡/.test(n) ? "card" : /核對附錄|核實/.test(n) ? "verify" : /股票分析|個股/.test(n) ? "stock" : /大盤/.test(n) ? "market" : "";
 function rawBody(req, max) {
@@ -169,8 +170,8 @@ async function upload(req, res, url) {
     method: "POST", headers: {Authorization: "Bearer " + tok, "Content-Type": "multipart/related; boundary=" + boundary}, body: payload});
   if (!r.ok) return json(res, 502, {error: "Drive " + r.status + " " + (await r.text()).slice(0, 160)});
   const f = await r.json();
-  // 令 PDF 可經連結查看（與現有報告一致），失敗唔影響上傳
-  try { await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}/permissions?supportsAllDrives=true`, {method: "POST", headers: {Authorization: "Bearer " + tok, "Content-Type": "application/json"}, body: JSON.stringify({role: "reader", type: "anyone"})}); } catch (e) {}
+  // 令 PDF 可經連結查看（與現有報告一致），失敗唔影響上傳；J Law 觀點係私人材料，唔開分享
+  if (cat !== "jlaw") try { await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}/permissions?supportsAllDrives=true`, {method: "POST", headers: {Authorization: "Bearer " + tok, "Content-Type": "application/json"}, body: JSON.stringify({role: "reader", type: "anyone"})}); } catch (e) {}
   known.add(f.id); cache = null;
   // replace=1：上載成功後，將同一資料夾內同名嘅舊檔放入垃圾桶（排程 worker 冇 Drive 連接器／管理員 header 只喺上載路徑生效，所以喺呢度做；垃圾桶可還原）
   const replaced = [];
@@ -183,6 +184,31 @@ async function upload(req, res, url) {
     } catch (e) { console.error("replace failed", e.message); }
   }
   json(res, 200, {row: [cat, f.id, f.name.replace(/\.pdf$/i, ""), f.createdTime, Number(f.size) || buf.length], replaced});
+}
+// J Law 觀點讀取：排程 session 只有 /api/upload（POST）會自動帶管理員密碼，所以借用呢條路徑：?op=jlaw-list／?op=jlaw-get&id=
+async function jlawOp(req, res, url) {
+  if (!googleConnected()) return json(res, 503, {error: "未連接 Google"});
+  const tok = await userToken(), folder = FOLDER_BY_CAT.jlaw, op = url.searchParams.get("op");
+  if (op === "jlaw-list") {
+    const q = new URLSearchParams({q: `'${folder}' in parents and trashed=false`, fields: "files(id,name,mimeType,createdTime,modifiedTime,size)", orderBy: "createdTime desc", pageSize: "200", supportsAllDrives: "true", includeItemsFromAllDrives: "true"});
+    const r = await fetch("https://www.googleapis.com/drive/v3/files?" + q, {headers: {Authorization: "Bearer " + tok}});
+    if (!r.ok) throw await driveErr("讀取 J Law 資料夾失敗", r);
+    return json(res, 200, {files: (await r.json()).files || []});
+  }
+  if (op === "jlaw-get") {
+    const id = url.searchParams.get("id") || "";
+    if (!/^[\w-]{10,80}$/.test(id)) return json(res, 400, {error: "id"});
+    const m = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=parents,mimeType&supportsAllDrives=true`, {headers: {Authorization: "Bearer " + tok}});
+    if (!m.ok) throw await driveErr("讀取失敗", m);
+    const meta = await m.json();
+    if (!(meta.parents || []).includes(folder)) return json(res, 404, {error: "唔係 J Law 資料夾內嘅檔案"});
+    const exp = /^application\/vnd\.google-apps\./.test(meta.mimeType) ? `/export?mimeType=${meta.mimeType.endsWith("document") ? "text/plain" : "application/pdf"}` : "?alt=media";
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}${exp}${exp.includes("?") ? "&" : "?"}supportsAllDrives=true`, {headers: {Authorization: "Bearer " + tok}});
+    if (!r.ok || !r.body) throw await driveErr("下載失敗", r);
+    res.writeHead(200, {"Content-Type": r.headers.get("content-type") || "application/octet-stream", "Cache-Control": "private, no-store"});
+    return require("stream").Readable.fromWeb(r.body).on("error", () => res.destroy()).pipe(res);
+  }
+  return json(res, 400, {error: "op"});
 }
 async function oauth(req, res, p, url) {
   if (p === "/api/oauth/url") {
@@ -568,6 +594,7 @@ http.createServer(async (req, res) => {
   if (p === "/api/upload" && req.method === "POST") {
     if (!ADMIN) return json(res, 503, {error: "未設定 ADMIN_PASSWORD"});
     const a = authed(req); if (a !== 200) return json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"});
+    if ((url.searchParams.get("op") || "").startsWith("jlaw-")) return jlawOp(req, res, url).catch(e => { console.error("jlaw failed", e.message); json(res, 500, {error: e.message}); });
     return upload(req, res, url).catch(e => { console.error("upload failed", e.message); json(res, 500, {error: e.message}); });
   }
   if (p === "/api/signals" && req.method === "GET") return sigApi(req, res).catch(e => { console.error("signals failed", e.message); json(res, 500, {error: e.message}); });

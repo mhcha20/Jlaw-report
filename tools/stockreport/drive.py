@@ -10,6 +10,9 @@
   drive.py market-shots <YYYY-MM-DD> [outDir] 大盤截圖：喺大盤截圖根資料夾搵「DD mon YYYY」子資料夾，列出 NN_TICKER_Daily.png，核對 19 張（IWM VIX SPY QQQ SOX 11 板塊 DXY GC1! US10Y）齊唔齊，並下載到 outDir（默認 /tmp/market-<DATE>；唔齊都會下載已有嘅，但印 INCOMPLETE）
   drive.py pdf <id> <out.pdf>                 下載網站報告 PDF
   drive.py trash <id> [<id>…]                 放入 Drive 垃圾桶（要 ADMIN；環境 proxy 自動帶密碼 header）
+  drive.py jlaw-list                          J Law 觀點私人資料夾內嘅檔案（新→舊：id、建立時間、名）
+  drive.py jlaw-get <id> <outFile>            下載一份 J Law 觀點（PDF；Google 文件會轉做文字）
+  drive.py jlaw-upload <file.pdf>             上載到 J Law 觀點私人資料夾（唔開連結分享）
   drive.py upload <file.pdf>                  上載（檔名要符合 YYYY-MM-DD_TICKER_類型.pdf；cat=auto；replace=1＝上載後自動將同資料夾同名舊檔放入垃圾桶）
 """
 import json, os, re, sys, urllib.parse, urllib.request
@@ -75,5 +78,12 @@ def main():
     elif c == 'trash': print(json.dumps(post('/api/delete', json.dumps({'ids': a[1:]}).encode()), ensure_ascii=False)[:400])
     elif c == 'upload':
         f = a[1]; print(json.dumps(post('/api/upload?name=' + urllib.parse.quote(os.path.basename(f)) + '&cat=auto&replace=1', open(f, 'rb').read(), 'application/pdf'), ensure_ascii=False))
+    elif c == 'jlaw-list':
+        for x in post('/api/upload?op=jlaw-list', b'')['files']: print(x['id'], x['createdTime'][:16], x['name'])
+    elif c == 'jlaw-get':
+        req = urllib.request.Request(SITE + '/api/upload?op=jlaw-get&id=' + a[1], data=b'', method='POST')
+        with urllib.request.urlopen(req, timeout=300) as r: open(a[2], 'wb').write(r.read()); print('saved', a[2])
+    elif c == 'jlaw-upload':
+        f = a[1]; print(json.dumps(post('/api/upload?name=' + urllib.parse.quote(os.path.basename(f)) + '&cat=jlaw&replace=1', open(f, 'rb').read(), 'application/pdf'), ensure_ascii=False))
     else: print(__doc__)
 if __name__ == '__main__': main()
