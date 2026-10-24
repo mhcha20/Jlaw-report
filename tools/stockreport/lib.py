@@ -223,8 +223,12 @@ def scrub_rules(h):
     h = h.replace('未決問題（交群組裁決）', '未決問題').replace('六、交返群組裁決嘅未決問題', '六、未決問題')
     h = re.sub(r'[，、；]?(?:請|交)群組(?:裁決|確認|判斷|補充)[^。；？<]*[？]?', '', h)          # 唔向群組「交裁決／請確認」
     h = re.sub(r'[，、；]?群組想用邊[種個][^。；？<]*[？]?', '', h)
+    h = re.sub(r'[（(]?(?:同群組公式一致|沿用群組口徑)[）)]?', '', h)
+    h = h.replace('對齊群組慣例，', '').replace('（對齊群組慣例）', '').replace('按群組口徑用', '用').replace('群組窗口未提供，', '').replace('冇群組機械定義', '冇機械定義')
+    h = re.sub(r'（或確認群組[^）]*）', '', h)
+    h = re.sub(r'[，、；：]?群組(?:想|有冇|對|是否)[^。；？<]*[？]?', '', h)
     h = re.sub(r'[，、；]?[^。；<>，]*倉位比例群組未提供[，,]?不自訂', '', h)
-    if '執行規則' not in h: return h
+    if '執行規則' not in h and '群組' not in h: return h
     h = re.sub(r'[；、]\s*(?:群組)?(?:大盤)?執行規則(?:（[^）]*）)?(?=[；。<])', '', h)          # 「…；承襲帳；大盤執行規則。」類缺項項目
     h = re.sub(r'(?:承襲帳|承襲帳同|承襲帳／)(?:群組)?(?:大盤)?執行規則', '承襲帳', h)
     def node(m):
@@ -237,6 +241,12 @@ def scrub_rules(h):
         out = re.sub(r'^[；，、：\s]+', '', out) if out.strip() else ''
         return '>' + out + '<'
     h = re.sub(r'>([^<>]*執行規則[^<>]*)<', node, h)
+    def node2(m):
+        t = m.group(1)
+        out = ''.join(p for p in re.split(r'(?<=[。？])', t) if '群組' not in p)
+        if out.count('「') > out.count('」'): out += '」'
+        return '>' + (re.sub(r'^[；，、：\s]+', '', out) if out.strip() else '') + '<'
+    h = re.sub(r'>([^<>]*群組[^<>]*)<', node2, h)
     h = re.sub(r'<li>\s*</li>', '', h)
     h = re.sub(r'<tr>(?:\s*<t[hd][^>]*>[^<]*</t[hd]>)?(?:\s*<td[^>]*>\s*</td>)+\s*</tr>', '', h)
     return h
