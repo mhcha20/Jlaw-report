@@ -322,7 +322,9 @@ async function sigIndex() {
 }
 function sigPayload() {
   // 以已解析（永久保存）嘅卡為準：Drive 檔案日後被刪，歷史都仍然喺度
-  const history = signals.buildHistory(Object.values(sig.cards));
+  // 買賣訊號同回測只用本站 V2.0 生成器卡（用戶決定；舊 Gemini 卡經抽查數字錯誤率高）；historyAll 只供群友對照頁顯示舊卡
+  const historyAll = signals.buildHistory(Object.values(sig.cards));
+  const history = signals.buildHistory(Object.values(sig.cards).filter(c => c.gen === "v2"));
   const rows = [], feed = [];
   for (const [ticker, list] of Object.entries(history)) {
     const last = list[list.length - 1], rec = sig.cards[last.id], cls = signals.classify(rec);
@@ -338,7 +340,7 @@ function sigPayload() {
   const failedIds = Object.keys(sig.fail).filter(i => !sig.cards[i]).length;
   const bt = {};
   for (const [t, l] of Object.entries(history)) { bt[t] = signals.backtest(l, barsOf(t)); if (!bt[t].hasPrices && px.t[t] && px.t[t].err) bt[t].pxErr = px.t[t].err; }
-  return {rows, history, bt, feed: feed.slice(0, 40), total: Math.max(files, rows.length), failed: failedIds, pending: sigState.pending, running: sigState.running, err: sigState.err, lastRun: sigState.lastRun,
+  return {rows, history, historyAll, onlyV2: true, bt, feed: feed.slice(0, 40), total: rows.length, totalAll: files, failed: failedIds, pending: sigState.pending, running: sigState.running, err: sigState.err, lastRun: sigState.lastRun,
     px: {have: Object.values(px.t).filter(e => e.rows && e.rows.length).length, failed: Object.values(px.t).filter(e => !(e.rows && e.rows.length)).length,
       src: [...new Set(Object.values(px.t).map(e => e.src).filter(Boolean))].join("/"), lastErr: (Object.values(px.t).find(e => e.err && !(e.rows && e.rows.length)) || {}).err || ""}};
 }
