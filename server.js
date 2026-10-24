@@ -146,7 +146,7 @@ const FOLDER_BY_CAT = {
   card: "1k0bxCss7lazu5Ozq6FX1oKUt-qbv5ZtU", stock: "1kIGilWMZYxBvfBpKbxOTVE8kJ4a_MnEb", verify: "1uVDlxdVLhrA6PWB-EsR5wRcPPskXTAog",
   market: "18yWn2hUykKaKru44HavWutfUST9Dux6_", daily: "1AeIL4vlhY5dqij_wtIF9paB0-cadqowE",
 };
-const detectCat = n => /每日跨股總表/.test(n) ? "daily" : /行動卡/.test(n) ? "card" : /核對附錄|核實/.test(n) ? "verify" : /股票分析|個股/.test(n) ? "stock" : /大盤/.test(n) ? "market" : "";
+const detectCat = n => /每日跨股總表/.test(n) ? "daily" : /大盤/.test(n) ? "market" : /行動卡/.test(n) ? "card" : /核對附錄|核實/.test(n) ? "verify" : /股票分析|個股/.test(n) ? "stock" : /大盤/.test(n) ? "market" : "";
 function rawBody(req, max) {
   return new Promise((resolve, reject) => {
     let n = 0; const chunks = [];
