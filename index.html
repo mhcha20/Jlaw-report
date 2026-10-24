@@ -743,7 +743,7 @@ const sameDayTag = (f, ref) => {   // 群友卡同本站卡日期唔同就唔好
   if(!ds.length || !f.date) return "";
   const same = ds.filter(x => x[1].date === f.date), diff = ds.filter(x => x[1].date !== f.date);
   return (same.length ? '<span class="bd ok">同日比較：' + same.map(x => x[0]).join("、") + '</span>' : "") +
-    (diff.length ? '<span class="bd diff">日期唔同（群友 ' + mdOf(f.date) + ' vs ' + diff.map(x => x[0] + " " + mdOf(x[1].date)).join("、") + '）</span>' : "");
+    (diff.length ? '<span class="bd diff">日期唔同（群友報告 ' + mdOf(f.date) + ' vs ' + diff.map(x => x[0] + " " + mdOf(x[1].date)).join("、") + '）</span>' : "");
 };
 const peerLine = (f, ref) => {
   const p = f.parsed || {}, scoreTxt = typeof p.score === "number" ? p.score + " " + esc(p.scoreScale || "") : "";
@@ -755,7 +755,7 @@ const peerLine = (f, ref) => {
 const verdictOf = f => f.v ? f.v.verdict : "unk";
 function renderPeer(){
   const el = $("#peer"); if(state.cat !== "peer") return;
-  const note = '<div class="warnbox">⚠ 負責人＝簽到認領者，未必係實際製作者；核對只比對行情數字，唔代表分析對錯；唔入買賣訊號。<br>Gemini 舊卡由之前 Google Gemini 流程出，經抽查數字錯誤率高、評級普遍偏高，已唔入買賣訊號；V2.0 重算由本站生成器按日線重算；三者日期唔同時唔可直接比較。</div>';
+  const note = '<div class="warnbox">⚠ 每隻股票有三種卡，來源唔同：<br>① <b>群友報告</b>：群組成員自己做、放喺「群友報告」資料夾（下面每行有負責人嗰啲）；負責人＝簽到認領者，未必係實際製作者。<b>唔係 Gemini 舊卡</b>，Gemini 舊卡嘅抽查結果唔適用。<br>② <b>Gemini 舊卡</b>：之前本站用 Google Gemini 出、放喺正式資料夾；經抽查數字錯誤率高、評級普遍偏高。<br>③ <b>V2.0 重算</b>：本站生成器按日線重算，買賣訊號／回測只用呢種。<br>群友報告同 Gemini 舊卡都唔入買賣訊號；核對只比對行情數字，唔代表分析對錯；三者日期唔同時唔可直接比較。</div>';
   if(pr.err){ el.innerHTML = note + '<p class="note">⚠ ' + esc(pr.err) + '</p><button class="sm" id="prRetry">重試</button>'; $("#prRetry").onclick = () => loadPeers(false); return; }
   if(!pr.data){ el.innerHTML = note + '<p class="note">讀取中…</p>'; return; }
   const d = pr.data, st = d.state || {}, all = d.files.filter(f => mktOk(mktOf(f.ticker, f.name)));
@@ -786,7 +786,7 @@ function renderPeer(){
       g.cards.slice().sort((a, b) => b.date.localeCompare(a.date) || b.mt.localeCompare(a.mt)).forEach(f => { (byOwner[f.signed ? f.owner : "未簽到"] ||= []).push(f); });
       return '<div class="pc"><span class="tk">' + esc(g.tk) + '</span>' +
         '<div class="our">' + (o.main || o.v2 ? (o.main ? refLine("Gemini 舊卡（網站最新）", o.main) : "") + (o.v2 ? refLine("V2.0 重算", o.v2) : "") : (pr.ours ? "本站未有行動卡" : "讀取中…")) + '</div>' +
-        (Object.values(byOwner).map(l => peerLine(l[0], o) + (l.length > 1 ? '<div class="mut">較舊 ' + (l.length - 1) + ' 份：' + l.slice(1).map(f => '<a href="#" data-pdf="' + esc(f.id) + '">' + esc(f.date || "冇日期") + '</a>').join("、") + '</div>' : "")).join("") || '<div class="mut">暫時冇群友行動卡</div>') +
+        (Object.values(byOwner).map(l => peerLine(l[0], o) + (l.length > 1 ? '<div class="mut">較舊 ' + (l.length - 1) + ' 份：' + l.slice(1).map(f => '<a href="#" data-pdf="' + esc(f.id) + '">' + esc(f.date || "冇日期") + '</a>').join("、") + '</div>' : "")).join("") || '<div class="mut">暫時冇群友報告行動卡</div>') +
         (g.others.length ? '<div class="mut" style="margin-top:4px">其他檔案：' + g.others.map(f => '<a href="#" data-pdf="' + esc(f.id) + '">' + ({stock:"本體報告", verify:"核對附錄"}[f.kind] || "其他") + " " + esc(f.date || "") + '</a>').join("、") + '</div>' : '') + '</div>';
     }).join("") || '<p class="note">冇資料。' + (st.running ? "" : "撳「重新掃描」讀取群友報告資料夾。") + '</p>';
     h += '<div class="note">每位負責人只顯示該股最新一份行動卡。收市價 ✓＝同行情收市價相符（容差 0.02 或 0.05%）；落後一日＝卡內收市價等於前一交易日收市；均線＝SMA 對行情重算（容差 0.05%）；成交量 ✓ ≤0.5%、來源差異 ≤3%、⚠ >3%；？＝攞唔到行情。</div>';
