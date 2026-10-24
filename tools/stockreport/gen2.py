@@ -64,7 +64,7 @@ def build_report(m, S, T):
 <div class="cards">
  <div class="cd {tone}"><div class="k">個股研究評等</div><div class="v">{S['rating']}　{sc:.0f} / 100</div><div class="s">上一份：{S['prev_md']} {prior_short}（計法唔同，唔作升降）· 覆蓋率 100%</div></div>
  <div class="cd {tone}"><div class="k">交易設置狀態</div><div class="v">{T['setup']}</div><div class="s">Pullback {'★'*pbs} · Breakout {'★'*bos}</div></div>
- <div class="cd {tone}"><div class="k">市場狀態及執行限制</div><div class="v">{S['mkt_state']}</div><div class="s">承襲 {S['mkt_ref']}；群組執行規則未收到，唔套用倉位上限</div></div>
+ <div class="cd {tone}"><div class="k">市場狀態及執行限制</div><div class="v">{S['mkt_state']}</div><div class="s">承襲 {S['mkt_ref']}</div></div>
 </div>
 <div class="concl2"><b>一句話結論：</b>{T['oneliner']}<div class="pl">回踩路徑：{B['zone'][0]:.2f}–{B['zone'][1]:.2f}（止損 {B['stop']:.2f}） · 順勢路徑：{A['trig_rule']}（觸發 {A['trig']:.2f}） · 減倉線 {S['reduce']:.2f}：距 {sg(d['reduce'])} · 離場線 {S['exitp']:.2f}：距 {sg(d['exit'])}，未觸發</div></div>
 {strip_svg(m, S)}
