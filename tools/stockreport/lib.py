@@ -217,6 +217,25 @@ def chips(h):
     for w in ('圖表', '外部', '計算', '推論'):
         h = h.replace(f'[{w}]', f'<span class="tg">{w}</span>')
     return h
+def scrub_rules(h):
+    """報告內任何位置唔提「群組執行規則」（群組有新規則會貼出）：刪走含呢個詞嘅句子／缺項項目，並清走空殼 <li>／<tr>"""
+    h = re.sub(r'(?:本份(?:亦)?)?唔套用倉位上限[；，。]?', '', h)
+    if '執行規則' not in h: return h
+    h = re.sub(r'[；、]\s*(?:群組)?(?:大盤)?執行規則(?:（[^）]*）)?(?=[；。<])', '', h)          # 「…；承襲帳；大盤執行規則。」類缺項項目
+    h = re.sub(r'(?:承襲帳|承襲帳同|承襲帳／)(?:群組)?(?:大盤)?執行規則', '承襲帳', h)
+    def node(m):
+        t = m.group(1)
+        parts = re.split(r'(?<=[。？])', t)
+        keep = [p for p in parts if '執行規則' not in p]
+        out = ''.join(keep)
+        if out.count('「') > out.count('」'): out += '」'
+        if out.count('（') > out.count('）'): out += '）'
+        out = re.sub(r'^[；，、：\s]+', '', out) if out.strip() else ''
+        return '>' + out + '<'
+    h = re.sub(r'>([^<>]*執行規則[^<>]*)<', node, h)
+    h = re.sub(r'<li>\s*</li>', '', h)
+    h = re.sub(r'<tr>(?:\s*<t[hd][^>]*>[^<]*</t[hd]>)?(?:\s*<td[^>]*>\s*</td>)+\s*</tr>', '', h)
+    return h
 def localize(h, S):
     """按市場（S['ccy']／['cur']…，plan_numbers 設默認）換走寫死嘅美股字眼，唔使每隻 worker 自己後處理"""
     h = re.sub(r'[（(]檔案[①②③][）)]', '', h)          # 唔再用「檔案①②③」字眼
@@ -228,6 +247,7 @@ def localize(h, S):
         h = h.replace('；計法不同，唔作升降', '；同一九構面計法，可直接比較升降')
         h = h.replace('（評分表未提供，無法逐格比較，唔當升降）', '（同一九構面計法，可直接比較升降）')
         h = h.replace('本份係首份，九構面全部重新起算，所以每格都寫理由', '九構面全部按當日數據重新評分，每格都寫理由')
+    h = scrub_rules(h)
     h = re.sub(r'[；，、]?(?:群組)?(?:大盤)?執行規則未收到[，,]唔套用倉位上限', '', h)    # 群組有新規則會貼出，唔使每份報告特別講
     h = re.sub(r'[，、]?按\s*V1\.0\s*唔套用倉位上限', '', h)
     ccy, cur = S.get('ccy', 'USD'), S.get('cur', '$')
