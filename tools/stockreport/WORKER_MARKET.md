@@ -70,3 +70,9 @@ python3 drive.py market                                   # 確認最新一份�
 - 圖面 MA 標籤同行情 SMA 一致到兩位小數（14 個 ETF，112 項 QA 全過）；圖面成交量同 Yahoo 差 0.5–4%（Cboe One vs 綜合量），以 Yahoo 為分子分母。
 - `/api/ohlcv` 對 XLRE 等 ETF 正常；VIXY／UUP 可取但唔等於 VIX／DXY，唔好當替代。
 - 工作目錄：build 會 chdir 到 `tools/stockreport/`，work 檔放 `work/`（已被 .gitignore）。
+
+## J Law 觀點（選填，用戶有提供 J Law Update PDF／影片先做）
+- `texts()` 加 `jlaw_html`：放喺「重點摘要」之後，標題「J Law 觀點對照及逐項核實」。先列用咗邊幾份 J Law 材料（日期／時間；只用分析交易日收市**之前或當日**發布嘅，之後發布嘅只可列作「後續參考」唔可用嚟支持結論）、J Law 當時嘅風險胃納（Risk-On／Neutral／Risk-Off）同幾份之間點變。
+- 逐項表：J Law 講法（短引述，註明日期）｜對當日數據核實（用 `CHART`／`CALC`／`EXT` 標籤，數字由 `m`／`S` f-string 取）｜結果（✅ 一致／❌ 唔一致／⚠ 未能核實／觀點：無法用數據核實）。J Law 嘅觀點同本報告自己嘅判斷分開寫，唔好將佢嘅觀點當成已核實事實；佢提到嘅歷史例子（例如 2025 年 1–4 月）有日線先核，冇就標未核實。
+- 有 J Law 材料時，`action_rows`（條件式行動清單）同第七節歷史比較可以引用佢提出嘅觀察重點，但門檻價位仍然要由圖表／行情得出。
+- 頁數上限加 4 頁（有 `jlaw_html` 時 ≤20）。J Law 材料係用戶私人提供，**唔好提交入 repo**，PDF 放 scratchpad。

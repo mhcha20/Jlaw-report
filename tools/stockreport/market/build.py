@@ -57,6 +57,7 @@ def main():
     print(json.dumps({'date': date, 'pdf': pp, 'pages': pages, 'qa_work': nq, 'qa_pdf': n, 'qa_pdf_fail': len(bad)}, ensure_ascii=False))
     for b in bad: print('PDF 文字回查失敗：', b, file=sys.stderr)
     if bad: die('PDF 文字回查有數字對唔上')
-    if pages > MAX_PAGES: die(f'{pages} 頁，超過上限 {MAX_PAGES}')
+    lim = MAX_PAGES + (4 if T.get('jlaw_html') else 0)   # 加 J Law 觀點一節可多 4 頁
+    if pages > lim: die(f'{pages} 頁，超過上限 {lim}')
 
 if __name__ == '__main__': main()

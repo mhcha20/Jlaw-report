@@ -63,6 +63,8 @@ def texts(m, S):
         # (事件, 美東日期, 'HH:MM' 或 None＝時間未核實, 預期／前值, 關注點[, cls])；香港時間自動換算
         'next_week': [('TODO', m.date, None, 'TODO', 'TODO')],
         'next_week_note': '', 'next_week_foot': 'TODO（日程以哪個來源為準；未核實日程唔補造）',
+        # 'jlaw_html': 選填；用戶有提供 J Law Update PDF／影片先寫（逐項：J Law 講法｜日期｜對今日數據核實（CHART／CALC／EXT）｜一致／唔一致／未能核實），冇就刪走呢個 key
+        # 'action_rows': 選填；條件式行動清單 [[#, 項目, 條件／做法], …]，非買賣建議
         'history_html': 'TODO（有充分證據才做；不足就寫明無法比較，唔指定歷史年份）',
         'regime_rows': [['<b>短線</b>', 'TODO', 'TODO', 'TODO'], ['<b>中期</b>', 'TODO', 'TODO', 'TODO'], ['<b>長期</b>', 'TODO', 'TODO', 'TODO']],
         'regime_box': 'TODO（總結分類、較前日有冇改變、市況標籤唔等於買賣許可）',
