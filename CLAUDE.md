@@ -10,6 +10,7 @@
 ## 技術同部署
 - 純 Node（無依賴）：`server.js`（伺服器＋API）、`index.html`（前端，單檔）、`data.js`（報告清單快照，網頁會用 Drive API 同步覆蓋）。
 - 部署：Railway project `jlaw-report`（`a358b772-7b5a-4459-8207-17b52019e588`），service `web`（`5b0d435c-c2e9-4374-a2c9-f10772af8b81`），environment `production`（`dfaafb33-e564-40ab-a485-58fba582049b`）。volume `/data` 存隱藏清單同 Google token。公開網址 `jlaw-report-a74806.up.railway.app`。
+- `railway.json`：啟動用 `node server.js`（唔經 npm，重新部署時 SIGTERM 正常退出，唔再出「npm error signal SIGTERM」被當 crash）；`watchPatterns` 只限網站檔案，改 `tools/`、`docs/`、`CLAUDE.md` 唔會觸發重新部署。
 - Railway 由 GitHub branch `claude/drive-reports-whatsapp-share-6m44wo` 自動部署。若 push 後冇自動重新部署，用 Railway MCP 嘅 `connect-service-source`（同一 repo＋branch）觸發。
 - 環境變數（只記名稱，值喺 Railway）：`DRIVE_API_KEY`、`ADMIN_PASSWORD`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`GOOGLE_SA_JSON`（已不再需要）、`SHEET_ID`（選填）。Google OAuth redirect URI：`https://jlaw-report-a74806.up.railway.app/oauth/callback`。
 - **唔好提交任何密碼、金鑰、token。** repo 係公開嘅。
@@ -31,7 +32,7 @@
 
 ## 約定
 - 報告檔名：`YYYY-MM-DD_TICKER_類型.pdf`；程式亦兼容 `TICKER-report-YYYY-MM-DD-繁體版`、`TICKER_JLaw_MYT_…_YYYYMMDD` 等格式，日期同股票代號由檔名解析。類型主要由 Drive 資料夾決定。
-- 只提交 `server.js`、`index.html`、`data.js`、`peers.js`、`package.json`、`docs/`、`CLAUDE.md`，同 `tools/stockreport/`（個股報告生成器，只放通用框架；每隻股票嘅分析內容唔提交）。測試用檔案放 scratchpad，唔好入 repo。
+- 只提交 `server.js`、`index.html`、`data.js`、`peers.js`、`package.json`、`railway.json`、`docs/`、`CLAUDE.md`，同 `tools/stockreport/`（個股報告生成器，只放通用框架；每隻股票嘅分析內容唔提交）。測試用檔案放 scratchpad，唔好入 repo。
 - 改動前端後，先用 Playwright（`/opt/pw-browsers/chromium`）以 390px 手機闊度測試。
 - 管理功能（上傳／隱藏／刪除／覆蓋檢查／重新分析訊號）需 `ADMIN_PASSWORD`（買賣訊號頁本身公開）；Drive 刪除需用戶 Google 授權（service account 唔可以刪用戶個人 Drive 嘅檔案）。
 

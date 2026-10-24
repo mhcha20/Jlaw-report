@@ -589,3 +589,5 @@ http.createServer(async (req, res) => {
   res.writeHead(200, {"Content-Type": types[path.extname(f)], "Cache-Control": "no-cache"});
   fs.createReadStream(path.join(__dirname, f)).pipe(res);
 }).listen(process.env.PORT || 3000, "0.0.0.0");
+// 重新部署時 Railway 會送 SIGTERM：正常收檔、以 0 退出，避免被當成 crash
+for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, () => { console.log(`${sig} received, shutting down`); process.exit(0); });
