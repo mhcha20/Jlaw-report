@@ -527,7 +527,8 @@ async function peersApi(req, res, p, url) {
     return require("stream").Readable.fromWeb(r.body).on("error", () => res.destroy()).pipe(res);
   }
   if (req.method !== "GET") return json(res, 405, {error: "method"});
-  const peerOwnerOf = t => { const k = peersLib.normTicker(t), a = (peers.actual || {})[k], s = (peers.owners[k] || {}).owner || "";
+  const canon = {}; Object.values(peers.actual || {}).forEach(v => { canon[v.toLowerCase()] = v; });   // 同一人大細楷唔同（shawn／Shawn）→ 用補充檔寫法合併
+  const peerOwnerOf = t => { const k = peersLib.normTicker(t), a = (peers.actual || {})[k], s0 = (peers.owners[k] || {}).owner || "", s = canon[s0.toLowerCase()] || s0;
     return {owner: a || s, signed: !!(a || s), ownerSrc: a ? "actual" : s ? "sign" : "", signOwner: s}; };
   if (!peerState.running && !peerState.lastRun && googleConnected()) peersRefresh();   // 重啟後第一次打開：自動掃描
   const files = Object.values(peers.files).map(r => ({id: r.id, name: r.name, kind: r.kind, size: r.size, mt: r.mt, ticker: r.ticker, key: peersLib.normTicker(r.ticker), date: r.date || r.fileDate || "", textDate: r.textDate || "",
