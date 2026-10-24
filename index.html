@@ -747,7 +747,7 @@ const sameDayTag = (f, ref) => {   // 群友卡同本站卡日期唔同就唔好
 };
 const peerLine = (f, ref) => {
   const p = f.parsed || {}, scoreTxt = typeof p.score === "number" ? p.score + " " + esc(p.scoreScale || "") : "";
-  return '<div class="pr"><div><span class="own">' + esc(f.signed ? f.owner : "未簽到") + '</span> <span class="mut">' + esc(f.date || "冇日期") + '</span> · ' +
+  return '<div class="pr"><div><span class="own">' + esc(f.signed ? f.owner : "未簽到") + '</span>' + (f.ownerSrc === "actual" ? '<span class="mut">（實際製作' + (f.signOwner && f.signOwner.toLowerCase() !== f.owner.toLowerCase() ? "；簽到：" + esc(f.signOwner) : "") + '）</span>' : f.ownerSrc === "sign" ? '<span class="mut">（簽到）</span>' : '') + ' <span class="mut">' + esc(f.date || "冇日期") + '</span> · ' +
     (p.stars ? "★".repeat(p.stars) + " " : "") + esc(p.rating || (f.image || f.err ? "" : "—")) + (scoreTxt ? " · " + scoreTxt : "") + '</div>' + (ref ? '<div>' + sameDayTag(f, ref) + '</div>' : '') + '<div>' + peerBadges(f) + '</div>' +
     '<div><a class="pdf" href="#" data-pdf="' + esc(f.id) + '">📄 PDF</a>' + (!f.image && !f.err ? '<button class="lnk" data-pd="' + esc(f.id) + '">' + (pr.open.has(f.id) ? "▲ 收起" : "▼ 今日動作／核對明細") + '</button>' : '') + '</div>' +
     (pr.open.has(f.id) ? peerDetail(f) : "") + '</div>';
@@ -755,7 +755,7 @@ const peerLine = (f, ref) => {
 const verdictOf = f => f.v ? f.v.verdict : "unk";
 function renderPeer(){
   const el = $("#peer"); if(state.cat !== "peer") return;
-  const note = '<div class="warnbox">⚠ 每隻股票有三種卡，來源唔同：<br>① <b>群友報告</b>：群組成員自己做、放喺「群友報告」資料夾（下面每行有負責人嗰啲）；負責人＝簽到認領者，未必係實際製作者。<b>唔係 Gemini 舊卡</b>，Gemini 舊卡嘅抽查結果唔適用。<br>② <b>Gemini 舊卡</b>：之前本站用 Google Gemini 出、放喺正式資料夾；經抽查數字錯誤率高、評級普遍偏高。<br>③ <b>V2.0 重算</b>：本站生成器按日線重算，買賣訊號／回測只用呢種。<br>群友報告同 Gemini 舊卡都唔入買賣訊號；核對只比對行情數字，唔代表分析對錯；三者日期唔同時唔可直接比較。</div>';
+  const note = '<div class="warnbox">⚠ 每隻股票有三種卡，來源唔同：<br>① <b>群友報告</b>：群組成員自己做、放喺「群友報告」資料夾（下面每行有負責人嗰啲）；負責人標「實際製作」係用戶確認嘅製作者，標「簽到」只係認領者，未必係實際製作者。<b>唔係 Gemini 舊卡</b>，Gemini 舊卡嘅抽查結果唔適用。<br>② <b>Gemini 舊卡</b>：之前本站用 Google Gemini 出、放喺正式資料夾；經抽查數字錯誤率高、評級普遍偏高。<br>③ <b>V2.0 重算</b>：本站生成器按日線重算，買賣訊號／回測只用呢種。<br>群友報告同 Gemini 舊卡都唔入買賣訊號；核對只比對行情數字，唔代表分析對錯；三者日期唔同時唔可直接比較。</div>';
   if(pr.err){ el.innerHTML = note + '<p class="note">⚠ ' + esc(pr.err) + '</p><button class="sm" id="prRetry">重試</button>'; $("#prRetry").onclick = () => loadPeers(false); return; }
   if(!pr.data){ el.innerHTML = note + '<p class="note">讀取中…</p>'; return; }
   const d = pr.data, st = d.state || {}, all = d.files.filter(f => mktOk(mktOf(f.ticker, f.name)));

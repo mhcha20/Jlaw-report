@@ -26,6 +26,7 @@
 
 ## 群友對照（👥 分頁，獨立，唔入訊號／回測）
 - 資料來源：私人 Drive 資料夾「群友報告」`1jAs8B7c3nbQlUbbBisnzZw_X4aHm8lGO`（子資料夾 行動卡_群友／個股研究報告_群友／核實報告_群友），用用戶 Google OAuth token（`userToken()`）讀；簽到表（分頁「個股 research list」欄 C 代號、欄 E 負責人）決定負責人。**簽到只代表認領者，未必係實際製作者**；未簽到歸「未簽到」；全數字代號按數值正規化（66＝00066）。
+- **實際製作者補充**：群友報告資料夾根目錄 `負責人補充.txt`（每行 `代號=名字`，`#` 後係備註）由 `peerActual()` 讀，有列嘅股票蓋過簽到表；`/api/peers` 每份檔帶 `ownerSrc`（`actual`／`sign`）同 `signOwner`，前端標「（實際製作）」或「（簽到）」。名字只放 Drive，唔入 repo。用戶話邊個實際做邊隻，就加入呢個檔。
 - `peers.js`：寬鬆解析行動卡文字（代號、日期、評等、分數＋制式、收市價、成交量、SMA、今日動作摘要）＋`verifyCard()` 對行情核對（容差同 `tools/stockreport/peers.py`）。本體報告／核對附錄只記檔案資訊。改解析規則要升 `PV`。
 - API 全部需 `ADMIN_PASSWORD`（內含群友名）：`GET /api/peers`、`POST /api/peers/refresh`、`GET /api/peers/pdf?id=`（只准該資料夾內嘅檔案）。結果存 `/data/peers.json`，每 6 小時自動更新，size 無變嘅卡唔重讀；行情用 `fetchOhlcv`／`mergeOhlcv`（`/data/ohlcv`）。前端 PDF 用 fetch＋blob 開（要帶密碼 header）。
 - 每隻股票頂部兩行（取自 `/api/signals` 嘅 `historyAll`）：「Gemini 舊卡（網站最新）」＝最新一張 `gen≠v2` 嘅卡；「V2.0 重算」＝最新一張 `gen=v2`。同名同日檔被 V2.0 取代嘅日子冇 Gemini 舊卡，就顯示前一日嘅 Gemini 舊卡，照實列日期。群友卡旁標「同日比較：…」或「日期唔同（群友 10/16 vs Gemini 舊卡 10/21）」，日期唔同唔可直接比。

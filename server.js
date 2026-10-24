@@ -425,6 +425,20 @@ async function peerOwners(tok) {
   }
   return o;
 }
+// 實際製作者補充：群友報告資料夾根目錄「負責人補充.txt」，每行「代號=名」（名字唔入 repo）；有就蓋過簽到表
+async function peerActual(tok) {
+  const q = new URLSearchParams({q: `'${PEER_ROOT}' in parents and name contains '負責人補充' and trashed=false`, fields: "files(id,name)", supportsAllDrives: "true", includeItemsFromAllDrives: "true"});
+  const r = await fetch("https://www.googleapis.com/drive/v3/files?" + q, {headers: {Authorization: "Bearer " + tok}});
+  if (!r.ok) throw await driveErr("讀取負責人補充失敗", r);
+  const f = ((await r.json()).files || [])[0]; if (!f) return {};
+  const t = await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media&supportsAllDrives=true`, {headers: {Authorization: "Bearer " + tok}});
+  if (!t.ok) throw await driveErr("讀取負責人補充失敗", t);
+  const o = {};
+  for (const line of (await t.text()).split(/\r?\n/)) {
+    const m = line.replace(/#.*/, "").match(/^\s*([A-Za-z0-9.]+)\s*[=＝:：\t]\s*(.+?)\s*$/); if (m) o[peersLib.normTicker(m[1].toUpperCase())] = m[2];
+  }
+  return o;
+}
 // 行情代號：全數字代號喺表內可能缺前導零，按表內主題補返（港 5 位／韓 6 位／日 4 位）
 function peerFetchSym(raw, key) {
   if (!/^\d+$/.test(raw)) return raw;
@@ -451,6 +465,7 @@ async function peersRefresh() {
     if (!googleConnected()) throw new Error("未連接 Google（請喺管理模式撳「連接 Google」），讀唔到群友報告資料夾");
     const tok = await userToken();
     try { peers.owners = await peerOwners(tok); peers.ownersAt = Date.now(); peers.ownersErr = ""; } catch (e) { peers.ownersErr = e.message; console.error("peers owners failed", e.message); }   // 簽到表讀唔到：沿用舊負責人
+    try { peers.actual = await peerActual(tok); } catch (e) { console.error("peers actual owners failed", e.message); }   // 讀唔到：沿用舊補充
     const list = await peerScan(tok);
     if (!list.length && Object.keys(peers.files).length) throw new Error("群友報告資料夾回傳 0 份 PDF，保留現有清單");
     const next = {};
@@ -512,9 +527,11 @@ async function peersApi(req, res, p, url) {
     return require("stream").Readable.fromWeb(r.body).on("error", () => res.destroy()).pipe(res);
   }
   if (req.method !== "GET") return json(res, 405, {error: "method"});
+  const peerOwnerOf = t => { const k = peersLib.normTicker(t), a = (peers.actual || {})[k], s = (peers.owners[k] || {}).owner || "";
+    return {owner: a || s, signed: !!(a || s), ownerSrc: a ? "actual" : s ? "sign" : "", signOwner: s}; };
   if (!peerState.running && !peerState.lastRun && googleConnected()) peersRefresh();   // 重啟後第一次打開：自動掃描
   const files = Object.values(peers.files).map(r => ({id: r.id, name: r.name, kind: r.kind, size: r.size, mt: r.mt, ticker: r.ticker, key: peersLib.normTicker(r.ticker), date: r.date || r.fileDate || "", textDate: r.textDate || "",
-    owner: (peers.owners[peersLib.normTicker(r.ticker)] || {}).owner || "", signed: !!(peers.owners[peersLib.normTicker(r.ticker)] || {}).owner,
+    ...peerOwnerOf(r.ticker),
     image: !!r.image, err: r.err || "", parsed: r.claim || null, v: r.v || null}));
   json(res, 200, {files, state: {...peerState}, ownersAt: peers.ownersAt, ownersErr: peers.ownersErr, googleConnected: googleConnected()});
 }
