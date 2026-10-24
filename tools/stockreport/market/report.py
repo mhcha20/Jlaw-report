@@ -11,7 +11,7 @@ def head(m, S, T):
     d = m.date
     o = [f'<h1>美股大盤分析　{d}（{wd(d)}）收市</h1>']
     ai = S['meta']
-    o.append(f'<p class="meta">分析框架：JW 大盤分析指令｜群組共用補充版 V1.0｜AI：{ai["ai"]}｜分析日期 {ai["analysis_date"]}（香港 UTC＋8）</p>')
+    o.append(f'<p class="meta">分析框架：JW 大盤分析指令｜共用補充版 V1.0｜AI：{ai["ai"]}｜分析日期 {ai["analysis_date"]}（香港 UTC＋8）</p>')
     o.append(f'<p class="meta">{T["inherit_note"]}</p>')
     return o
 
@@ -243,8 +243,8 @@ def s9(m, S, T):
 
 def tail(m, S, T):
     a = S['meta']
-    o = [sec('', '可直接貼到群組嘅簡短摘要'), box(T['group_summary']), sec('', '報告註明')]
-    rows = [['分析框架', 'JW 大盤分析指令｜群組共用補充版'], ['AI', a['ai_note']], ['模式', a['mode']],
+    o = [sec('', '可直接轉貼嘅簡短摘要'), box(T['group_summary']), sec('', '報告註明')]
+    rows = [['分析框架', 'JW 大盤分析指令｜共用補充版'], ['AI', a['ai_note']], ['模式', a['mode']],
             ['分析日期', f'{a["analysis_date"]}（香港 UTC＋8）｜美國交易日 {m.date}'], ['外部來源', a['sources']],
             ['免責', '分析框架與個人判讀，用於研究交流，<b>不構成投資建議</b>。價位隨交易日更新。不提供勝率或發生機率，亦不把市況分類當作買賣許可。']]
     o.append(table(None, rows, widths=['14%', '86%'], kv=True))

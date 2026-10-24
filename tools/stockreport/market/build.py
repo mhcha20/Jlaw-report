@@ -49,7 +49,7 @@ def main():
     hp, pp = os.path.join(out, name + '.html'), os.path.join(out, name + '.pdf')
     open(hp, 'w', encoding='utf-8').write(doc)
     jf = os.path.join(out, f'jobs_market_{date}.json')
-    json.dump([dict(html=hp, pdf=pp, footer=f'{title}｜JW 大盤分析指令 群組共用補充版 V1.0｜不構成投資建議')], open(jf, 'w'), ensure_ascii=False)
+    json.dump([dict(html=hp, pdf=pp, footer=f'{title}｜JW 大盤分析指令 共用補充版 V1.0｜不構成投資建議')], open(jf, 'w'), ensure_ascii=False)
     subprocess.check_call(['node', 'render.js', jf])
     info = subprocess.run(['pdfinfo', pp], capture_output=True, text=True).stdout
     pages = int(re.search(r'Pages:\s+(\d+)', info).group(1))
