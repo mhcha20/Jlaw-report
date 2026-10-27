@@ -9,6 +9,8 @@ cd <repo> && npm ci --silent                          # signals.js 用 pdfjs-dis
 ```
 Playwright／Chromium 已預裝（`/opt/node22/lib/node_modules/playwright`，唔好 `playwright install`）。
 
+> 環境：生成器支援 Python 3.11 或以上（`python3` 直接用，唔使轉 3.12）；`prep.py images` 喺 PIL 用唔到時會自動改用 ImageMagick（`convert`），裁出嚟嘅圖一樣。
+
 ## 1. 取截圖（要齊 17 張，缺就停，回報 `incomplete`）
 排程 session **冇 Drive 連接器**，一律用 `drive.py`（經網站 API；有連接器都照用呢套，結果一樣）：
 ```

@@ -29,8 +29,25 @@ def data(ticker, date, extra=None):
     json.dump(out, open(f'{HERE}/data/{ticker}_{date}.json', 'w'))   # 每日專屬檔，build.py 優先用
     print(f'{ticker} {j["symbol"]}: {len(rows)} 根，最後 {rows[-1]["d"]} 收 {rows[-1]["c"]} 量 {rows[-1]["v"]:,}')
 
+def _images_magick(ticker, folder):
+    """PIL 用唔到時（排程環境曾出現）改用 ImageMagick，裁切同 PIL 版一樣"""
+    import glob, subprocess
+    for f in sorted(glob.glob(f'{folder}/*Futubull*.png')):
+        w, h = map(int, subprocess.check_output(['identify', '-format', '%w %h', f]).split())
+        x0, y0, x1, y1 = int(w*0.108), int(h*0.045), int(w*0.888), int(h*0.965)
+        c = f.replace('.png', '_c.png')
+        subprocess.check_call(['convert', f, '-crop', f'{x1-x0}x{y1-y0}+{x0}+{y0}', '+repage', c])
+        if os.path.basename(f)[:2] in ('06', '07', '08', '09'):
+            cw, ch = x1 - x0, y1 - y0
+            subprocess.check_call(['convert', '(', c, '-crop', f'560x{ch-150}+0+150', '+repage', ')', '(', c, '-crop', f'1330x{ch-150}+{cw-1330}+150', '+repage', ')', '+append', f.replace('.png', '_t.png')])
+    print('done', ticker, '(ImageMagick)')
+
 def images(ticker, folder):
-    from PIL import Image
+    try:
+        from PIL import Image
+    except Exception as e:
+        print('PIL 用唔到（' + type(e).__name__ + '），改用 ImageMagick', file=sys.stderr)
+        return _images_magick(ticker, folder)
     import glob
     for f in sorted(glob.glob(f'{folder}/*Futubull*.png')):
         im = Image.open(f); w, h = im.size

@@ -87,7 +87,7 @@ def build_report(m, S, T):
             ('50MA ＞ 200MA', f'[計算] {m["ma50"]:.2f} ÷ {m["ma200"]:.2f} − 1 ＝ {sg((m["ma50"]/m["ma200"]-1)*100)}' + ('（緩衝不足 2%，緩衝有限）' if abs((m["ma50"]/m["ma200"]-1)*100) < 2 else ''), '緩衝充足' if abs((m["ma50"]/m["ma200"]-1)*100) >= 2 else '緩衝有限'),
             ('Higher High／Higher Low', T['hhhl'], '結構'),
             ('Momentum', T['mom'], '動能')], ['16%', '60%', '24%']) + \
-        note(f'均線口徑：收盤價自行重建 SMA（含當日），{S['src_label']} {len(m['closes'])} 根，同 TradingView 圖示對照一致到兩位小數。ATR14 簡單平均 ${m["atr14"]:.2f}（{m["atrp"]:.2f}%）、Wilder 平滑 ${m["atr14w"]:.2f}（{m["atrpw"]:.2f}%），並列，本報告距離及倍數一律用簡單平均值。RSI14 取自 TradingView 圖面；第三方交叉核對：TradingView／Futubull 圖面 SMA 與重算值一致（附錄第三節）。最近 30 個交易日有 {m["above50_30"]} 日收市高於當日 SMA50。')
+        note(f'均線口徑：收盤價自行重建 SMA（含當日），{S["src_label"]} {len(m["closes"])} 根，同 TradingView 圖示對照一致到兩位小數。ATR14 簡單平均 ${m["atr14"]:.2f}（{m["atrp"]:.2f}%）、Wilder 平滑 ${m["atr14w"]:.2f}（{m["atrpw"]:.2f}%），並列，本報告距離及倍數一律用簡單平均值。RSI14 取自 TradingView 圖面；第三方交叉核對：TradingView／Futubull 圖面 SMA 與重算值一致（附錄第三節）。最近 30 個交易日有 {m["above50_30"]} 日收市高於當日 SMA50。')
     # ---------------- page 3
     svg1 = chart(m, 120, vol_ma=m['v50'], width=720, height=300, hlines=T['chart1_lines'])
     p3 = '<div class="pg"></div>' + band('技術', '成交量及圖表形態', '第四、五部分') + \
@@ -121,7 +121,7 @@ def build_report(m, S, T):
     px_days = [m['bars'][i][0] for i in range(n - 20, n) if C[i] >= A['cond_px']]
     full_days = [m['bars'][i][0] for i in range(n - 20, n) if C[i] >= A['cond_px'] and V[i] >= sum(V[i-50:i]) / 50]
     S['b_days'] = b_days; S['px_days'] = px_days; S['full_days'] = full_days
-    tests_txt = (f'① 大市上升趨勢 {mk(tests[0])}（{S['mkt_state']}）；② 第二階段 {mk(tests[1])}（{T["stage_test"]}）；③ RRR ≥ 2 {mk(tests[2])}（回踩 {rr(B["R"][-1])}／順勢 {rr(A["R"][-1])}）；'
+    tests_txt = (f'① 大市上升趨勢 {mk(tests[0])}（{S["mkt_state"]}）；② 第二階段 {mk(tests[1])}（{T["stage_test"]}）；③ RRR ≥ 2 {mk(tests[2])}（回踩 {rr(B["R"][-1])}／順勢 {rr(A["R"][-1])}）；'
                  f'④ 雜訊被掃率 < 30% {mk(tests[3])}（回踩 {sB[0]}／{sB[1]}＝{sB[0]/sB[1]*100:.0f}%；順勢 {sA[0]}／{sA[1]}＝{sA[0]/sA[1]*100:.0f}%）。缺 {4-sum(tests)} 項 → 標準倉{S["tier"]}。檔位對應嘅倉位比例群組未提供，不自訂。{T["tier_tail"]}')
     plan_rows = [
         ('最佳買入價（R1）', f'回踩路徑（機械式）：低位進入 {B["zone"][0]:.2f}–{B["zone"][1]:.2f}（下限＝{T["zone_lo_def"]}；上限＝{T["zone_hi_def"]}），參考入場價 {B["entry"]:.2f}。順勢路徑：{A["trig_rule"]}，參考入場價 {A["trig"]:.2f}；距現價 {sg(d["trig"])}。'),
@@ -167,7 +167,7 @@ def build_report(m, S, T):
     p8 = '<div class="pg"></div>' + band('判斷', '評分及最後結論', '第十二、十三部分') + \
         secx('第十二部分｜交易評分', '本份係首份，九構面全部重新起算，所以每格都寫理由') + \
         table(['構面', '星級', '理由'], [(n_, stars(dd[n_][0]), dd[n_][1]) for n_ in ordered], ['13%', '14%', '73%']) + \
-        note(f'總分：{sc:.0f}／100（{stars_n}／45 星按比例換算 {sc:.1f}，四捨五入；9 項全部評分，覆蓋率 100%；機構支持嘅 Hard Evidence 限於 13F／Form 4 截圖，RS 百分位缺項）。上一份 {S['prev_md']}：{prior_short}（評分表未提供，無法逐格比較，唔當升降）。分數不是勝率，不可跨股比較。') + \
+        note(f'總分：{sc:.0f}／100（{stars_n}／45 星按比例換算 {sc:.1f}，四捨五入；9 項全部評分，覆蓋率 100%；機構支持嘅 Hard Evidence 限於 13F／Form 4 截圖，RS 百分位缺項）。上一份 {S["prev_md"]}：{prior_short}（評分表未提供，無法逐格比較，唔當升降）。分數不是勝率，不可跨股比較。') + \
         secx('第十三部分｜最後結論') + f'<div class="concl3"><span>評等 <b>{S["rating"]}</b></span><span>總分 <b>{sc:.0f}／100</b></span><span>個股：{S["rating"]}／市場：{S["mkt_state"]}（承襲）</span></div>' + \
         f'<div class="two"><div class="pn"><div class="pt">保留 {S["rating"].split(" ")[0]} 原因</div>{facts(T["keep"])}</div><div class="pn"><div class="pt">不升級的原因</div>{facts(T["noup"])}</div></div>' + \
         f'<h3>與上一份（{S["prev_md"]} 行動卡）逐項比較</h3>' + table(['項目', md()], [
