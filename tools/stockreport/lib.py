@@ -157,13 +157,24 @@ def chart(m, nbars, ma_list=(10, 20, 50, 200), zones=(), hlines=(), right_pad=0,
     for k in ma_list:
         pts = ' '.join(f'{X(i):.1f},{Y(ma_at(k,i)):.1f}' for i in range(i0, n))
         s.append(f'<polyline points="{pts}" fill="none" stroke="{cols[k]}" stroke-width="1.1"/>')
-    # horizontal lines
-    for h in hlines:
+    # horizontal lines；右側價位標籤若互相重疊（例如現價貼近入場價）就上下推開，線本身唔郁
+    hl = [(Y(min(h['p'], pmax)), h) for h in hlines]
+    LBH = 11.5
+    ly = [y for y, _ in hl]
+    order = sorted(range(len(ly)), key=lambda i: ly[i])
+    for _ in range(20):
+        moved = False
+        for a, b2 in zip(order, order[1:]):
+            gap = ly[b2] - ly[a]
+            if gap < LBH:
+                d = (LBH - gap) / 2; ly[a] -= d; ly[b2] += d; moved = True
+        if not moved: break
+    for (y, h), yl in zip(hl, ly):
         clipped = h['p'] > pmax
-        y = Y(min(h['p'], pmax))
         s.append(f'<line x1="{pad_l}" x2="{W-pad_r}" y1="{y:.1f}" y2="{y:.1f}" stroke="{h["color"]}" stroke-width="{h.get("w",1)}" stroke-dasharray="{h.get("dash","4,3")}"/>')
-        s.append(f'<rect x="{W-pad_r+1}" y="{y-6:.1f}" width="{pad_r-2}" height="11" fill="{h["color"]}"/>')
-        s.append(f'<text x="{W-pad_r+3}" y="{y+2.5:.1f}" font-size="7.6" fill="#fff">{h["p"]:.2f}{"↑" if clipped else ""}</text>')
+        if abs(yl - y) > 0.5: s.append(f'<line x1="{W-pad_r}" x2="{W-pad_r+1}" y1="{y:.1f}" y2="{yl:.1f}" stroke="{h["color"]}" stroke-width=".8"/>')
+        s.append(f'<rect x="{W-pad_r+1}" y="{yl-6:.1f}" width="{pad_r-2}" height="11" fill="{h["color"]}"/>')
+        s.append(f'<text x="{W-pad_r+3}" y="{yl+2.5:.1f}" font-size="7.6" fill="#fff">{h["p"]:.2f}{"↑" if clipped else ""}</text>')
         if h.get('label'):
             s.append(f'<text x="{pad_l+3}" y="{y-2:.1f}" font-size="7.5" fill="{h["color"]}">{h["label"]}</text>')
     # x labels (month starts)
