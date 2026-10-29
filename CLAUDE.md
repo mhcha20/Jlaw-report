@@ -25,6 +25,7 @@
 - 未有讀取：個股本體報告、核對附錄。
 
 ## 群友對照（👥 分頁，獨立，唔入訊號／回測）
+- **群友回測**（👥 分頁內「💰 群友回測 $100」）：`peersRefresh()` 尾段 `peersBacktest()` 只用群友報告行動卡（每股每日取最新 `mt`，唔分負責人；`claim.action` 以「未持倉：／已持倉：」切 flat／held，非 /100 分數唔用）行同一套 `buildHistory()`／`backtest()`，行情用 `peerRows`；結果存 `peers.bt`／`btPx`／`btAt`，由 `/api/peers` 回傳，前端 `btHtml(d, {links:false, extra})` 顯示。**同 V2.0 回測完全分開，唔會撈埋**（用戶 2026-10-29 要求）。
 - 資料來源：私人 Drive 資料夾「群友報告」`1jAs8B7c3nbQlUbbBisnzZw_X4aHm8lGO`（子資料夾 行動卡_群友／個股研究報告_群友／核實報告_群友），用用戶 Google OAuth token（`userToken()`）讀；簽到表（分頁「個股 research list」欄 C 代號、欄 E 負責人）決定負責人。**簽到只代表認領者，未必係實際製作者**；未簽到歸「未簽到」；全數字代號按數值正規化（66＝00066）。
 - **實際製作者補充**：群友報告資料夾根目錄 `負責人補充.txt`（每行 `代號=名字`，`#` 後係備註）由 `peerActual()` 讀，有列嘅股票蓋過簽到表；`/api/peers` 每份檔帶 `ownerSrc`（`actual`／`sign`）同 `signOwner`，前端標「（實際製作）」或「（簽到）」。名字只放 Drive，唔入 repo。用戶話邊個實際做邊隻，就加入呢個檔。簽到表名字同補充檔名字只係大細楷唔同就當同一人（用補充檔寫法）。
 - `peers.js`：寬鬆解析行動卡文字（代號、日期、評等、分數＋制式、收市價、成交量、SMA、今日動作摘要）＋`verifyCard()` 對行情核對（容差同 `tools/stockreport/peers.py`）。本體報告／核對附錄只記檔案資訊。改解析規則要升 `PV`。

@@ -526,6 +526,7 @@ async function peersRefresh() {
       catch (e) { r.v = {close: {st: "unk"}, sma: {st: "na", items: []}, vol: {st: "na"}, lag: false, verdict: "unk", note: "核對出錯：" + e.message}; }
     }
     for (const r of Object.values(next)) if (r.kind !== "card") { r.ticker = r.ticker || ""; r.date = r.fileDate || ""; }
+    await peersBacktest(next);
     savePeers();
   } catch (e) { peerState.err = e.message; console.error("peers refresh failed", e.message); }
   finally { peerState.running = false; peerState.pending = 0; peerState.lastRun = Date.now(); }
@@ -536,6 +537,28 @@ const peersGate = (req, res) => {
   return true;
 };
 if (process.env.PEERS_AUTO !== "0") { setTimeout(() => { if (googleConnected()) peersRefresh(); }, 45000); setInterval(() => { if (googleConnected()) peersRefresh(); }, 6 * 3600e3); }
+// 群友報告回測：同 V2.0 回測一樣嘅機械規則（diffCards／backtest），但只用「群友報告」資料夾嘅行動卡；每股每日取最新上傳嗰份（唔分負責人）
+async function peersBacktest(files) {
+  const byKey = {};
+  for (const r of Object.values(files)) {
+    if (r.kind !== "card" || !r.claim || !r.ticker || !r.date) continue;
+    const a = r.claim.action || "", iu = a.search(/未持倉\s*[：:]/), ih = a.search(/已持倉\s*[：:]/);
+    const flat = iu >= 0 ? a.slice(iu, ih > iu ? ih : undefined).replace(/^未持倉\s*[：:]\s*/, "") : ih < 0 ? a : "";
+    const held = ih >= 0 ? a.slice(ih).replace(/^已持倉\s*[：:]\s*/, "") : "";
+    const key = peersLib.normTicker(r.ticker);
+    (byKey[key] ||= []).push({id: r.id, ticker: r.ticker, date: r.date, up: r.mt || "", stars: r.claim.stars, rating: r.claim.rating, score: r.claim.scoreScale === "/100" ? r.claim.score : undefined, close: r.claim.close, flat, held, gen: "peer"});
+  }
+  const bt = {}, today = new Date().toISOString().slice(0, 10); let have = 0, failed = 0;
+  for (const [key, cards] of Object.entries(byKey)) {
+    const h = signals.buildHistory(cards); const list = Object.values(h)[0]; if (!list) continue;
+    const t = cards[0].ticker, sym = peerFetchSym(t, key); let rows = [];
+    if (sym) { try { rows = await peerRows(sym, today); } catch (e) { console.error("peers bt ohlcv failed", sym, e.message); } }
+    const bars = rows.filter(b => typeof b.o === "number" && typeof b.c === "number").map(b => ({d: b.d, o: b.o, c: b.c}));
+    bt[t] = signals.backtest(list, bars); bt[t].cards = list.length;
+    if (bars.length) have++; else { failed++; bt[t].pxErr = sym ? "攞唔到行情" : "短數字代號，表內冇對應市場"; }
+  }
+  peers.bt = bt; peers.btPx = {have, failed, src: "yahoo"}; peers.btAt = Date.now();
+}
 async function peersApi(req, res, p, url) {
   if (!peersGate(req, res)) return;
   if (p === "/api/peers/refresh") {
@@ -560,7 +583,7 @@ async function peersApi(req, res, p, url) {
   const files = Object.values(peers.files).map(r => ({id: r.id, name: r.name, kind: r.kind, size: r.size, mt: r.mt, ticker: r.ticker, key: peersLib.normTicker(r.ticker), date: r.date || r.fileDate || "", textDate: r.textDate || "",
     ...peerOwnerOf(r.ticker),
     image: !!r.image, err: r.err || "", parsed: r.claim || null, v: r.v || null}));
-  json(res, 200, {files, state: {...peerState}, ownersAt: peers.ownersAt, ownersErr: peers.ownersErr, googleConnected: googleConnected()});
+  json(res, 200, {files, state: {...peerState}, ownersAt: peers.ownersAt, ownersErr: peers.ownersErr, googleConnected: googleConnected(), bt: peers.bt || {}, btPx: peers.btPx || {have: 0, failed: 0}, btAt: peers.btAt || 0});
 }
 
 async function admin(req, res, p) {

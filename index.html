@@ -655,7 +655,7 @@ function timeline(list, tk){
 const pc = x => (x >= 0 ? "+" : "") + (x * 100).toFixed(2) + "%";
 const WD = ["日","一","二","三","四","五","六"];
 const wd = d => d.slice(5) + "（" + WD[new Date(d + "T00:00:00Z").getUTCDay()] + "）";
-function btHtml(d){
+function btHtml(d, o = {}){   // o.title 標題；o.links=false 唔出正式資料夾報告連結（群友報告係私人檔）；o.extra(r) 每隻股票加一行
   const bt = d.bt || {}, all = Object.entries(bt).map(([t, r]) => ({t, ...r}));
   if(!all.length) return '<p class="note">未有足夠資料做回測。</p>';
   const N = all.length, inv = 100 * N, fin = all.reduce((s, r) => s + r.final, 0);
@@ -669,10 +669,11 @@ function btHtml(d){
   const lastBuy = r => [...(r.trades || []).map(t => t.buy.fillDate), r.open && r.open.fillDate, ...(r.pending || []).filter(p => p.side === "buy").map(p => p.signalDate)].filter(Boolean).sort().pop() || "";
   const sorted = all.slice().sort((a, b) => sg.btSort === "new" ? lastBuy(b).localeCompare(lastBuy(a)) || a.t.localeCompare(b.t) : sg.btSort === "ret" ? b.ret - a.ret : sg.btSort === "low" ? a.ret - b.ret : a.t.localeCompare(b.t));
   const sb = (k, l) => '<button class="sm' + (sg.btSort === k ? " on" : "") + '" data-bs="' + k + '">' + l + '</button>';
-  const why = (label, f, t) => '<div class="sub"><b>' + label + '：</b>' + esc(f.why || "") + (f.detail || []).map(x => '<br>・' + esc(x)).join("") + repLinks(t, f.signalDate) + '</div>';   // 買賣原因：一句總結＋當日卡內明細
+  const links = (t, dt) => o.links === false ? "" : repLinks(t, dt);
+  const why = (label, f, t) => '<div class="sub"><b>' + label + '：</b>' + esc(f.why || "") + (f.detail || []).map(x => '<br>・' + esc(x)).join("") + links(t, f.signalDate) + '</div>';   // 買賣原因：一句總結＋當日卡內明細
   const buyTxt = b => wd(b.signalDate) + ' 出訊號 → <b>' + wd(b.fillDate) + ' 開市價 ' + p2(b.price) + ' 買入</b>';
   const sellTxt = s => wd(s.signalDate) + ' 出訊號 → <b>' + wd(s.fillDate) + ' 開市價 ' + p2(s.price) + ' 賣出</b>';
-  return '<div class="sum"><div class="hd"><span class="dt">每隻 $100 模擬</span><span class="mut">' + from.slice(5) + ' → ' + to.slice(5) + ' · ' + N + ' 隻</span></div>' +
+  return '<div class="sum"><div class="hd"><span class="dt">' + esc(o.title || "每隻 $100 模擬") + '</span><span class="mut">' + from.slice(5) + ' → ' + to.slice(5) + ' · ' + N + ' 隻</span></div>' +
     '<div class="stats"><div class="st ' + (fin >= inv ? "g" : "r") + '"><b>' + pc(fin / inv - 1) + '</b><span>總報酬</span></div><div class="st g"><b>' + win + '</b><span>賺錢</span></div><div class="st r"><b>' + lose + '</b><span>蝕錢</span></div><div class="st w"><b>' + none + '</b><span>未入場</span></div></div>' +
     '<div class="hl"><b>總投入：</b>$' + inv.toFixed(0) + ' → <b>$' + fin.toFixed(2) + '</b>　<b>已平倉交易：</b>' + closed.length + ' 次（勝 ' + cw + ' 負 ' + (closed.length - cw) + '）' +
     (pend ? '　<b>⏳ 待成交：</b>' + pend + ' 單' : '') + (bhAvg !== null ? '　<b>同期一直持有（平均）：</b>' + pc(bhAvg) : '') + '</div>' +
@@ -684,9 +685,9 @@ function btHtml(d){
       const status = !r.hasPrices ? '⚠ 未攞到行情，計唔到成交' + (r.pxErr ? '（' + esc(r.pxErr) + '）' : '') : r.open ? '持倉中（最新收市 ' + p2(r.open.now) + '，' + r.open.nowDate.slice(5) + '）' : r.traded ? '已平倉' : (r.pending || []).length ? '⏳ 訊號待成交' : '未入場（未有買入訊號）';
       const trs = r.trades.map(t => '<div>' + buyTxt(t.buy) + '<br>' + sellTxt(t.sell) + '　<b class="' + (t.ret >= 0 ? "pos" : "neg") + '">' + pc(t.ret) + '</b>' + why("買因", t.buy, r.t) + why("賣因", t.sell, r.t) + '</div>').join("<hr>") +
         (r.open ? (r.trades.length ? "<hr>" : "") + '<div>' + buyTxt(r.open) + '<br>持倉中，最新收市（' + r.open.nowDate.slice(5) + '）' + p2(r.open.now) + '　<b class="' + (r.open.ret >= 0 ? "pos" : "neg") + '">' + pc(r.open.ret) + '</b>' + why("買因", r.open, r.t) + '</div>' : '') +
-        (r.pending || []).map(p => '<div class="sub">⏳ ' + wd(p.signalDate) + ' 出' + (p.side === "buy" ? "買入" : "賣出") + '訊號（' + esc(p.why) + '），等待下一個交易日開市價成交' + (p.detail || []).map(x => '<br>・' + esc(x)).join("") + repLinks(r.t, p.signalDate) + '</div>').join("");
+        (r.pending || []).map(p => '<div class="sub">⏳ ' + wd(p.signalDate) + ' 出' + (p.side === "buy" ? "買入" : "賣出") + '訊號（' + esc(p.why) + '），等待下一個交易日開市價成交' + (p.detail || []).map(x => '<br>・' + esc(x)).join("") + links(r.t, p.signalDate) + '</div>').join("");
       return '<div class="btr" data-bt="' + esc(r.t) + '"><div class="top"><span class="big">' + esc(r.t) + '</span><span class="big ' + (r.ret >= 0.00005 ? "pos" : r.ret <= -0.00005 ? "neg" : "") + '">$' + r.final.toFixed(2) + '（' + pc(r.ret) + '）</span></div>' +
-        '<div class="sub">' + r.trades.length + ' 次平倉（勝 ' + r.wins + ' 負 ' + r.losses + '）· ' + status + (sg.btSort === "new" && lastBuy(r) ? ' · 最近買入 ' + lastBuy(r).slice(5) : '') + (r.bh !== null && r.bh !== undefined ? ' · 一直持有 ' + pc(r.bh) : '') + '</div>' +
+        '<div class="sub">' + r.trades.length + ' 次平倉（勝 ' + r.wins + ' 負 ' + r.losses + '）· ' + status + (sg.btSort === "new" && lastBuy(r) ? ' · 最近買入 ' + lastBuy(r).slice(5) : '') + (r.bh !== null && r.bh !== undefined ? ' · 一直持有 ' + pc(r.bh) : '') + '</div>' + (o.extra ? o.extra(r) : '') +
         (open ? '<div class="tr">' + (trs || '<span class="mut">未有交易</span>') + '</div>' : (trs ? '<div class="sub">點擊睇每次買賣日期同價位 ▾</div>' : '')) + '</div>';
     }).join("") +
     '<div class="ft"><b>模擬假設：</b>每隻股票起始 $100；<b>買入訊號出咗之後，下一個交易日開市價買入；賣出訊號出咗之後，下一個交易日開市價全數賣出</b>，所得複利滾存。起始日已係買入狀態亦當作買入訊號。同日買賣訊號並存時，持倉當賣出、未持倉唔買；持倉時再出現買入訊號唔加倉。持倉中按最新收市價計。可買碎股，唔計手續費、滑點同稅。<br><b>留意：</b>開市價嚟自免費日線行情，可能同你券商實際成交價有差異（開市即時價波動大）；只有約 ' + Math.max(...all.map(r => r.days)) + ' 日數據，樣本好少，過去表現唔代表將來；呢個唔係投資建議。</div>';
@@ -764,9 +765,15 @@ function renderPeer(){
   const stat = (st.running ? "掃描中…" + (st.pending ? "（仲有 " + st.pending + " 份）" : "") : st.lastRun ? "最後掃描 " + hkTime(new Date(st.lastRun).toISOString()) + " HKT" : "未掃描") +
     " · " + cards.length + " 份行動卡 / 共 " + all.length + " 份檔案";
   let h = note + (st.err ? '<div class="warnbox">⚠ ' + esc(st.err) + '</div>' : '') + (d.ownersErr ? '<div class="warnbox">⚠ 簽到表讀取失敗，負責人可能唔齊：' + esc(d.ownersErr) + '</div>' : '') +
-    '<div class="bar"><button class="sm' + (pr.view === "stock" ? " on" : "") + '" data-pv="stock">按股票</button><button class="sm' + (pr.view === "person" ? " on" : "") + '" data-pv="person">按人</button>' +
+    '<div class="bar"><button class="sm' + (pr.view === "stock" ? " on" : "") + '" data-pv="stock">按股票</button><button class="sm' + (pr.view === "person" ? " on" : "") + '" data-pv="person">按人</button><button class="sm' + (pr.view === "bt" ? " on" : "") + '" data-pv="bt">💰 群友回測 $100</button>' +
     '<input type="search" id="prQ" placeholder="搜尋股票代號／負責人" value="' + esc(pr.q) + '"><button class="sm" id="prRef"' + (st.running ? " disabled" : "") + '>🔄 重新掃描</button></div><div class="note">' + stat + '</div>';
-  if(pr.view === "person"){
+  if(pr.view === "bt"){
+    const ownerOf = {}; cards.forEach(f => { ownerOf[f.ticker] = f.signed ? f.owner : "未簽到"; });
+    const bt = {}; Object.entries(d.bt || {}).forEach(([t, r]) => { if(mktOk(mktOf(t, "")) && (!q || t.toLowerCase().includes(q) || (ownerOf[t] || "").toLowerCase().includes(q))) bt[t] = r; });
+    h += '<div class="warnbox">呢個回測<b>只用「群友報告」資料夾嘅行動卡</b>，同 📊 買賣訊號嘅 V2.0 回測完全分開，唔會撈埋。買賣訊號規則一樣（評等轉買入／未持倉轉條件式建倉＝買；評等跌出買入／已持倉轉減倉離場＝賣），' +
+      '每股每日只取最新上傳嗰份，唔分負責人。群友卡格式各人唔同，評等或今日動作讀唔到嘅日子會當冇變化；卡斷咗幾日嘅，訊號只按有卡嘅日子比較。' + (d.btAt ? '<br>最後計算：' + hkTime(new Date(d.btAt).toISOString()) + ' HKT' : '') + '</div>';
+    h += btHtml({bt, px: d.btPx}, {title: "群友報告 每隻 $100 模擬", links: false, extra: r => '<div class="sub">負責人：' + esc(ownerOf[r.t] || "未簽到") + ' · 行動卡 ' + (r.cards || 0) + ' 日</div>'});
+  } else if(pr.view === "person"){
     const by = {}; cards.forEach(f => { const o = f.signed ? f.owner : "未簽到"; (by[o] ||= []).push(f); });
     const rowsP = Object.entries(by).filter(([o]) => !q || o.toLowerCase().includes(q)).map(([o, l]) => {
       const okN = l.filter(f => verdictOf(f) === "ok").length, wN = l.filter(f => verdictOf(f) === "warn").length, n = okN + wN;
@@ -793,6 +800,8 @@ function renderPeer(){
   }
   el.innerHTML = h;
   el.querySelectorAll("[data-pv]").forEach(b => b.onclick = () => { pr.view = b.dataset.pv; renderPeer(); });
+  el.querySelectorAll("[data-bs]").forEach(b => b.onclick = () => { sg.btSort = b.dataset.bs; renderPeer(); });
+  el.querySelectorAll("[data-bt]").forEach(b => b.onclick = ev => { if(ev.target.closest("a")) return; const t = b.dataset.bt; sg.btOpen.has(t) ? sg.btOpen.delete(t) : sg.btOpen.add(t); renderPeer(); });
   el.querySelectorAll("[data-pd]").forEach(b => b.onclick = () => { const i = b.dataset.pd; pr.open.has(i) ? pr.open.delete(i) : pr.open.add(i); renderPeer(); });
   el.querySelectorAll("[data-pdf]").forEach(a => a.onclick = async e => { e.preventDefault(); await openPeerPdf(a.dataset.pdf); });
   $("#prRef").onclick = () => loadPeers(true);
