@@ -68,8 +68,14 @@ def parse_card_text(x):
     if m: o['c6_main'] = (num(m.group(1)), float(m.group(2)))
     m = re.search(r'到(?!主)([\d,\.]+)只[有得]([\d\.]+)R', s6)
     if m: o['c6_first'] = (num(m.group(1)), float(m.group(2)))
-    m = re.search(r'(?:回踩|回測)區入場（(?:主目標)?([\d\.]+)R）', s6)
-    if m: o['R_pb'] = float(m.group(1))
+    # 回踩入場 R（到主目標）：卡內寫法有幾款，按次序試；「aR／bR」或「T1 aR、主目標 bR」取主目標嗰個
+    for pat in (r'(?:回踩|回測)區入場（(?:主目標)?([\d\.]+)R）',
+                r'(?:回踩|回測|支持)(?:區|路徑)(?:入場)?主目標([\d\.]+)R',
+                r'(?:回踩|回測)區(?:參考價)?入場（[\d\.]+R／([\d\.]+)R',
+                r'(?:回踩|回測)路徑T1[\d\.]+R、主目標([\d\.]+)R',
+                r'回踩[\d,\.]+入（主目標([\d\.]+)R）'):
+        m = re.search(pat, s6)
+        if m: o['R_pb'] = float(m.group(1)); break
     o['no_cmp'] = bool(re.search(r'計法不同|唔作升降|重新起算', x[:6000]))
     o['v2'] = '唔做嘅代價' in x and '三條價位' in x
     return o
