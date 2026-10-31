@@ -20,13 +20,24 @@ def market_of(t):
     t = str(t)
     if t.isdigit(): return 'HK' if len(t) == 5 else 'KR' if len(t) == 6 else 'JP'
     return 'US'
-def market_defaults(t): return MARKETS[market_of(t)]
+def us_close_hk(d=None):
+    """美東 16:00 收市＝香港幾點：夏令（EDT）次日 04:00，冬令（EST，11 月第一個星期日起）次日 05:00"""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    t = datetime.fromisoformat((d or DATE) + 'T16:00').replace(tzinfo=ZoneInfo('America/New_York'))
+    return t.astimezone(ZoneInfo('Asia/Hong_Kong')).strftime('%H:%M'), t.tzname()
+def market_defaults(t):
+    d = dict(MARKETS[market_of(t)])
+    if d['mkt'] == 'US':
+        hk, tz = us_close_hk()
+        d['asof'] = f'16:00 {tz}（香港 次日 {hk}）'; d['asof_full'] = f'美東 當日 16:00 {tz}＝香港 次日 {hk}'
+    return d
 
 def plan_numbers(m, S):
     c = m['close']
     A, B = S['A'], S['B']
     for k_, v_ in market_defaults(S['t']).items(): S.setdefault(k_, v_)
-    for k_, v_ in dict(asof='16:00 ET（香港 次日 04:00）', asof_full='美東 當日 16:00＝香港 次日 04:00', src_note='網站 /api/ohlcv（Yahoo Finance 日線，正常交易時段、不復權）', src_label='Yahoo 日線', mkt_state='反彈嘗試', prev_note='', ver_note='本份係 V2.0 首份試做：承襲帳同大盤執行規則未提供，唔套用、唔自行訂立。', ai_line='AI：Claude，直接閱讀截圖圖像。', shot_note='截圖於當日收市後拍攝', prev_md='前一交易日', mkt_ref='大盤報告').items(): S.setdefault(k_, v_)
+    for k_, v_ in dict(src_note='網站 /api/ohlcv（Yahoo Finance 日線，正常交易時段、不復權）', src_label='Yahoo 日線', mkt_state='反彈嘗試', prev_note='', ver_note='本份係 V2.0 首份試做：承襲帳同大盤執行規則未提供，唔套用、唔自行訂立。', ai_line='AI：Claude，直接閱讀截圖圖像。', shot_note='截圖於當日收市後拍攝', prev_md='前一交易日', mkt_ref='大盤報告').items(): S.setdefault(k_, v_)
     S['A']['risk'] = A['trig'] - A['stop']; S['B']['risk'] = B['entry'] - B['stop']
     S['A']['R'] = [R(A['trig'], A['stop'], t) for t in A['T']]
     S['B']['R'] = [R(B['entry'], B['stop'], t) for t in B['T']]

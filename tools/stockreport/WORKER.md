@@ -11,6 +11,8 @@ Playwright／Chromium 已預裝（`/opt/node22/lib/node_modules/playwright`，�
 
 > 環境：生成器支援 Python 3.11 或以上（`python3` 直接用，唔使轉 3.12）；`prep.py images` 喺 PIL 用唔到時會自動改用 ImageMagick（`convert`），裁出嚟嘅圖一樣。
 
+> 美國冬令時間（11 月第一個星期日至 3 月第二個星期日）收市係香港 **05:00**（夏令 04:00）；頁首「資料截止」由 `gen.market_defaults()` 按 DATE 自動寫 EDT／EST。睇圖時核對右下角 UTC 鐘：冬令要 ≥ 21:00 UTC（夏令 ≥ 20:00 UTC）先係收市後截圖，早過就當截圖未齊（待下一輪）。
+
 ## 1. 取截圖（要齊 17 張，缺就停，回報 `incomplete`）
 排程 session **冇 Drive 連接器**，一律用 `drive.py`（經網站 API；有連接器都照用呢套，結果一樣）：
 ```
