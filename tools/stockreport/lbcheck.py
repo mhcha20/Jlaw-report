@@ -5,10 +5,10 @@
   python3 lbcheck.py verify AAPL 2026-10-30 AAPL_lb.json   # 同 data/AAPL_2026-10-30.json 最後一根比對（收市差 ≤0.02 或 ≤0.05% 當一致）
   python3 lbcheck.py extra  AAPL 2026-10-30 AAPL_lb.json   # 印出可傳畀 prep.py data --extra 嘅 JSON（只含 DATE 當日 bar，v 單位股）
   python3 lbcheck.py calendar AAPL.US cal.json             # finance_calendar 結果（_jq 過濾後）→ 下次業績日一句
-日期取 timestamp 前 10 位；非美股如日期差一日，加 --shift=1（日期 +1 日）。唔會寫入任何網站檔案。
+日期由 timestamp 自動換算（美股、港股、日韓都啱）；--shift=N 只係後備手動調整。唔會寫入任何網站檔案。
 """
 import json, sys, os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 def load(p):
@@ -16,9 +16,12 @@ def load(p):
     return j.get('candlesticks', j) if isinstance(j, dict) else j
 
 def bars(rows, shift=0):
+    # Longbridge 日線 timestamp 係當地午夜（UTC）：美股 04:00Z／05:00Z＝同日，港股 16:00Z、日韓 15:00Z＝下一日；
+    # 加 12 小時再取日期就三個市場都啱（2026-10-29 用 AAPL.US、3690.HK 實測）
     out = {}
     for r in rows:
-        d = (date.fromisoformat(r['timestamp'][:10]) + timedelta(days=shift)).isoformat()
+        t = datetime.fromisoformat(r['timestamp'].replace('Z', '+00:00')) + timedelta(hours=12)
+        d = (t.date() + timedelta(days=shift)).isoformat()
         out[d] = dict(d=d, o=float(r['open']), h=float(r['high']), l=float(r['low']), c=float(r['close']), v=float(r['volume']))
     return out
 
