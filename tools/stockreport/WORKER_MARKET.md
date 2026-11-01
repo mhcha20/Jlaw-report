@@ -76,3 +76,7 @@ python3 drive.py market                                   # 確認最新一份�
 - 逐項表：J Law 講法（短引述，註明日期）｜對當日數據核實（用 `CHART`／`CALC`／`EXT` 標籤，數字由 `m`／`S` f-string 取）｜結果（✅ 一致／❌ 唔一致／⚠ 未能核實／觀點：無法用數據核實）。J Law 嘅觀點同本報告自己嘅判斷分開寫，唔好將佢嘅觀點當成已核實事實；佢提到嘅歷史例子（例如 2025 年 1–4 月）有日線先核，冇就標未核實。
 - 有 J Law 材料時，`action_rows`（條件式行動清單）同第七節歷史比較可以引用佢提出嘅觀察重點，但門檻價位仍然要由圖表／行情得出。
 - 頁數上限加 4 頁（有 `jlaw_html` 時 ≤20）。J Law 材料係用戶私人提供，**唔好提交入 repo**，PDF 放 scratchpad。
+
+## Longbridge（排程已接駁，2026-11-01 起）
+- SPY／QQQ／IWM 同 11 板塊收市：`history_candlesticks_by_offset(symbol="SPY.US", count=3, trade_sessions="intraday")` 同 Yahoo 對一次，唔一致並列；Yahoo 未有 D 嗰根就用佢經 `--extra` 補。
+- 未來一星期事件：`finance_calendar(category="macrodata", market="US", start, end, _jq=…)` 同 `category="report"`（一定要傳 market＋_jq 過濾，避免截斷），同 WebSearch 結果互相核對。
