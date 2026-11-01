@@ -63,7 +63,7 @@ Yahoo 成交量同 Longbridge／TradingView 有時唔同（例：NVDA 2026-09-21
 
 ## 4c. 其他提醒（來自試跑）
 - 朗讀稿用 `from lib import zh, zhint`（`zh(221.97)`→「二百二十一點九七」）。
-- 下次財報日：有 Longbridge 工具就用 `finance_calendar`（見下面「Longbridge 核實」）；排程 session 冇，查唔到就標「未公布」（唔好估）。
+- 下次財報日：有 Longbridge 工具就用 `finance_calendar`（見下面「Longbridge 核實」）；排程 session 用 `lbcheck.py live-earnings`（要金鑰，見「Longbridge 核實」），查唔到就標「未公布」（唔好估）。
 - 4H／2H 截圖含盤後 bar：圖面 RSI 同價只作參考，日線 RSI 先係正式讀數。
 - 若 50 日均量被單日異常大量（>2.5×中位數）拉高，要喺 `caliber`／`vol_rows` 並列中位數或剔除後數值，並註明。
 - 朗讀稿內嘅倍數、取整、百分比最易錯，要由 spec／計算值產生或逐個入 QA。
@@ -137,10 +137,15 @@ python3 daily.py 2026-10-21 [--market US|ASIA|ALL] [--out DIR] [--upload] [--str
 ## 先大盤、後個股（美股）
 美股個股報告一定要喺當日大盤報告（`drive.py market` 有 `<D>_美股大盤分析_JW框架_Claude核實版`）上載之後先做，市場配合同 R4 大市測試要按當日大盤評，頁首寫「承襲 <D> 大盤報告」。大盤未出就唔好做個股（等下一輪）；只有最後一輪仍未有，先用最新一份並註明承襲。亞洲股用本地圖面指數，唔受此限。
 
-## Longbridge 核實（只限 session 有 `mcp__Longbridge__*` 工具時；排程 session 暫時冇，見 CLAUDE.md）
+## Longbridge 核實
+**兩條路**：①session 有 `mcp__Longbridge__*` 工具 → 照下面 1–3 用 MCP；②冇 MCP（排程 session）→ 用 `lbcheck.py` 直連模式（3 個金鑰喺環境變數 `LONGBRIDGE_APP_KEY／APP_SECRET／ACCESS_TOKEN`，要 `pip install -q longport`）：
+- 開頭先 `python3 lbcheck.py check NVDA.US`：`OK` 先用下面指令；exit 2（缺金鑰／網絡／權限）＝今次冇 Longbridge 核實，**照舊用 Yahoo＋截圖，喺收尾警告一句，唔好停工、唔好當數據不一致**。
+- 收市核實 `python3 lbcheck.py live-verify <T> <DATE>`（exit 0 一致、1 不一致→附錄第三節並列、2 直連失敗、3 市場未支援＝日韓）；補 bar `live-extra <T> <DATE>`；下次業績日 `live-earnings <T> <DATE>`（一句，可直接寫入報告；「查唔到」就標「未公布」）。港股代號會自動轉（00066→66.HK）。
+- 金鑰 **永遠唔好** 寫入檔案、commit、截圖、貼入報告或回報文字。
+MCP 做法（有 `mcp__Longbridge__*` 時）：
 工具名 `mcp__Longbridge__*`（未載入就先 ToolSearch `select:mcp__Longbridge__history_candlesticks_by_offset,mcp__Longbridge__finance_calendar`）。代號格式：美股 `AAPL.US`、港股 `700.HK`／`3690.HK`（**唔好補前導零**，`00700.HK` 會回空）、其他市場 Longbridge 未必有，冇就照舊用 Yahoo＋截圖。
 1. **收市核實（每隻都做，1 次呼叫）**：`history_candlesticks_by_offset(symbol, count=3, trade_sessions="intraday", forward_adjust=false)`，同 `data/<T>_<DATE>.json` 最後一根比：收市差 ≤0.02 或 ≤0.05% 當一致；唔一致就查日期／復權，喺附錄第三節並列。成交量 Longbridge 同 Yahoo 口徑可能唔同，並列唔平均。
 2. **Yahoo 未有 DATE 嗰根**：用上面結果經 `prep.py data … --extra` 補入（優先過截圖讀數），附錄註明「DATE OHLCV 來源 Longbridge」。
 3. **下次業績日**：`finance_calendar(category="report", market="US", start=DATE, end=DATE+45 日, _jq='[.list[].infos[] | select(.symbol=="AAPL.US") | {symbol,date,date_type}]')`；港股 market="HK"。查到就寫日期＋盤前／盤後（來源 Longbridge 財經日曆，以公司公告為準），查唔到先標「未公布」。
-5. 輔助腳本 `lbcheck.py`（只處理已存低嘅 Longbridge JSON，用法見檔頭）：`verify`＝收市比對、`extra`＝出 `--extra` JSON、`calendar`＝下次業績日一句。
+5. 輔助腳本 `lbcheck.py`：`verify`／`extra`／`calendar` 處理 MCP 存低嘅 JSON；`live-*` 直連（見上）。用法見檔頭。
 4. 唔好用 Longbridge 做交易、改自選股或任何寫入動作（工具本身亦唔會落單）。
