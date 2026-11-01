@@ -138,6 +138,7 @@ python3 daily.py 2026-10-21 [--market US|ASIA|ALL] [--out DIR] [--upload] [--str
 美股個股報告一定要喺當日大盤報告（`drive.py market` 有 `<D>_美股大盤分析_JW框架_Claude核實版`）上載之後先做，市場配合同 R4 大市測試要按當日大盤評，頁首寫「承襲 <D> 大盤報告」。大盤未出就唔好做個股（等下一輪）；只有最後一輪仍未有，先用最新一份並註明承襲。亞洲股用本地圖面指數，唔受此限。
 
 ## Longbridge 核實
+**排程 worker 每隻美股／港股必做**（日韓跳過）：①`python3 lbcheck.py live-verify <T> <D>` 收市核實；②`python3 lbcheck.py live-earnings <T> <D>` 攞下次業績日寫入報告（取代「未公布」）；③Yahoo 缺 D 嗰根先用 `live-extra` 補。全部 exit 2＝冇金鑰／連唔到，照舊用 Yahoo＋截圖，**收尾 JSON 嘅 notes 要寫「冇 Longbridge 核實」**，唔好停工。
 **兩條路**：①session 有 `mcp__Longbridge__*` 工具 → 照下面 1–3 用 MCP；②冇 MCP（排程 session）→ 用 `lbcheck.py` 直連模式（3 個金鑰喺環境變數 `LONGBRIDGE_APP_KEY／APP_SECRET／ACCESS_TOKEN`，要 `pip install -q longport`）：
 - 開頭先 `python3 lbcheck.py check NVDA.US`：`OK` 先用下面指令；exit 2（缺金鑰／網絡／權限）＝今次冇 Longbridge 核實，**照舊用 Yahoo＋截圖，喺收尾警告一句，唔好停工、唔好當數據不一致**。
 - 收市核實 `python3 lbcheck.py live-verify <T> <DATE>`（exit 0 一致、1 不一致→附錄第三節並列、2 直連失敗、3 市場未支援＝日韓）；補 bar `live-extra <T> <DATE>`；下次業績日 `live-earnings <T> <DATE>`（一句，可直接寫入報告；「查唔到」就標「未公布」）。港股代號會自動轉（00066→66.HK）。

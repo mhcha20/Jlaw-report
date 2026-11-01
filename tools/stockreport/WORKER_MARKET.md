@@ -78,5 +78,6 @@ python3 drive.py market                                   # 確認最新一份�
 - 頁數上限加 4 頁（有 `jlaw_html` 時 ≤20）。J Law 材料係用戶私人提供，**唔好提交入 repo**，PDF 放 scratchpad。
 
 ## Longbridge（有 `mcp__Longbridge__*` 用 MCP；排程 session 用 `lbcheck.py live-*` 直連，見 WORKER.md「Longbridge 核實」；直連失敗就照舊 Yahoo＋截圖並喺收尾警告）
+- **排程每日必做（直連）**：`pip install -q longport 2>&1 | tail -1; python3 lbcheck.py check SPY.US`；`OK` → 對 SPY、QQQ、IWM 各跑 `python3 lbcheck.py live-verify <T> <D>`（讀 `market/data/<T>.json`；exit 0 一致、1 不一致→並列第二節、2／3 冇核實），結果寫入第二節資料來源一句（例：「SPY／QQQ／IWM 收市同 Longbridge 一致」）；exit 2 就照舊 Yahoo＋截圖，收尾警告「⚠ 今次冇 Longbridge 核實」。金鑰只喺環境變數，唔好印出或寫入。
 - SPY／QQQ／IWM 同 11 板塊收市：`history_candlesticks_by_offset(symbol="SPY.US", count=3, trade_sessions="intraday")` 同 Yahoo 對一次，唔一致並列；Yahoo 未有 D 嗰根就用佢經 `--extra` 補。
 - 未來一星期事件：`finance_calendar(category="macrodata", market="US", start, end, _jq=…)` 同 `category="report"`（一定要傳 market＋_jq 過濾，避免截斷），同 WebSearch 結果互相核對。

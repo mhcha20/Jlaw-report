@@ -37,7 +37,12 @@ def bars(rows, shift=0):
 def verify(t, d, p, shift=0):
     lb = bars(load(p), shift)
     if d not in lb: raise SystemExit(f'Longbridge 冇 {d} 嗰根（有：{sorted(lb)}）→ 日期／時區（試 --shift）或未收市')
-    mine = json.load(open(f'{HERE}/data/{t}_{d}.json'))['bars'][-1]   # [MM-DD,o,h,l,c,v千股]
+    f = f'{HERE}/data/{t}_{d}.json'
+    if os.path.exists(f): mine = json.load(open(f))['bars'][-1]   # [MM-DD,o,h,l,c,v千股]
+    else:   # 大盤：market/data/<T>.json（rows: d,o,h,l,c,v股）
+        r = next((x for x in json.load(open(f'{HERE}/market/data/{t}.json'))['rows'] if x['d'] == d), None)
+        if not r: raise SystemExit(f'本地冇 {d} 嗰根（{f} 同 market/data/{t}.json 都冇）')
+        mine = [d[5:], r['o'], r['h'], r['l'], r['c'], round(r['v'] / 1000)]
     assert mine[0] == d[5:], f'data 最後一根係 {mine[0]}，唔係 {d[5:]}'
     x, ok = lb[d], True
     for k, i, name in (('o', 1, '開'), ('h', 2, '高'), ('l', 3, '低'), ('c', 4, '收')):
