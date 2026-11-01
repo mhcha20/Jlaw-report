@@ -142,4 +142,5 @@ python3 daily.py 2026-10-21 [--market US|ASIA|ALL] [--out DIR] [--upload] [--str
 1. **收市核實（每隻都做，1 次呼叫）**：`history_candlesticks_by_offset(symbol, count=3, trade_sessions="intraday", forward_adjust=false)`，同 `data/<T>_<DATE>.json` 最後一根比：收市差 ≤0.02 或 ≤0.05% 當一致；唔一致就查日期／復權，喺附錄第三節並列。成交量 Longbridge 同 Yahoo 口徑可能唔同，並列唔平均。
 2. **Yahoo 未有 DATE 嗰根**：用上面結果經 `prep.py data … --extra` 補入（優先過截圖讀數），附錄註明「DATE OHLCV 來源 Longbridge」。
 3. **下次業績日**：`finance_calendar(category="report", market="US", start=DATE, end=DATE+45 日, _jq='[.list[].infos[] | select(.symbol=="AAPL.US") | {symbol,date,date_type}]')`；港股 market="HK"。查到就寫日期＋盤前／盤後（來源 Longbridge 財經日曆，以公司公告為準），查唔到先標「未公布」。
+5. 輔助腳本 `lbcheck.py`（只處理已存低嘅 Longbridge JSON，用法見檔頭）：`verify`＝收市比對、`extra`＝出 `--extra` JSON、`calendar`＝下次業績日一句。
 4. 唔好用 Longbridge 做交易、改自選股或任何寫入動作（工具本身亦唔會落單）。
