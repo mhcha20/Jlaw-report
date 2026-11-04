@@ -1,6 +1,6 @@
 # 每隻股票嘅 work 檔範本：複製成 work/<TICKER>_<DATE>.py，將所有 'TODO' 同 0 換成當日截圖／行情得出嘅內容。
 # 只提供結構（欄位名同類型），冇任何分析內容。build.py 會 import 呢個檔嘅 spec(m) 同 texts(m, S)。
-# S 欄位可選覆蓋：asof、asof_full、mkt_ref（非美股默認已按市場設好）、ccy、cur、src_name、smart_hard、cov、ma_chk。
+# S 欄位可選覆蓋：asof、asof_full、mkt_ref（非美股默認已按市場設好）、ccy、cur、src_name、smart_hard、cov、ma_chk、prior_cmp（上一份評分表比較句，默認「評分表未提供，無法逐格比較，唔當升降」；舊報告有星數就寫「舊報告有逐構面星數，但計法不同，唔作升降」）。
 from lib import *   # zh()／zhint() 朗讀稿數字用
 
 def spec(m):

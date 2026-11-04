@@ -167,7 +167,7 @@ def build_report(m, S, T):
     p8 = '<div class="pg"></div>' + band('判斷', '評分及最後結論', '第十二、十三部分') + \
         secx('第十二部分｜交易評分', '本份係首份，九構面全部重新起算，所以每格都寫理由') + \
         table(['構面', '星級', '理由'], [(n_, stars(dd[n_][0]), dd[n_][1]) for n_ in ordered], ['13%', '14%', '73%']) + \
-        note(f'總分：{sc:.0f}／100（{stars_n}／45 星按比例換算 {sc:.1f}，四捨五入；9 項全部評分，覆蓋率 100%；機構支持嘅 Hard Evidence 限於 13F／Form 4 截圖，RS 百分位缺項）。上一份 {S["prev_md"]}：{prior_short}（評分表未提供，無法逐格比較，唔當升降）。分數不是勝率，不可跨股比較。') + \
+        note(f'總分：{sc:.0f}／100（{stars_n}／45 星按比例換算 {sc:.1f}，四捨五入；9 項全部評分，覆蓋率 100%；機構支持嘅 Hard Evidence 限於 13F／Form 4 截圖，RS 百分位缺項）。上一份 {S["prev_md"]}：{prior_short}（{S.get("prior_cmp", "評分表未提供，無法逐格比較，唔當升降")}）。分數不是勝率，不可跨股比較。') + \
         secx('第十三部分｜最後結論') + f'<div class="concl3"><span>評等 <b>{S["rating"]}</b></span><span>總分 <b>{sc:.0f}／100</b></span><span>個股：{S["rating"]}／市場：{S["mkt_state"]}（承襲）</span></div>' + \
         f'<div class="two"><div class="pn"><div class="pt">保留 {S["rating"].split(" ")[0]} 原因</div>{facts(T["keep"])}</div><div class="pn"><div class="pt">不升級的原因</div>{facts(T["noup"])}</div></div>' + \
         f'<h3>與上一份（{S["prev_md"]} 行動卡）逐項比較</h3>' + table(['項目', md()], [

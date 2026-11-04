@@ -107,7 +107,7 @@ python3 drive.py reports <TICKER> <DATE>      # 上載前後都查：同 ticker 
 - `drive.py latest` 唔會顯示同日舊檔，要用 `drive.py reports`。
 
 ## 非美股本地化（已內建，唔使再後處理）
-`gen.MARKETS` 按代號自動判斷市場（字母＝US、5 位數字＝HK、6 位＝KR、4 位＝JP），默認設好收市時間、幣別（HKD／JPY／KRW；`HK$`／`¥`／`₩`）、資料源字眼（Yahoo）、機構資料字眼、覆蓋率字眼、冇本地大盤報告嘅 `mkt_ref`；`lib.localize()` 喺 `page()` 內自動將 `USD`／`$12.3`／`Longbridge`／`13F／Form 4`／`覆蓋率 100%`／TradingView 均線對照句換成對應市場版本。work 檔只需要喺 `spec()` 入面覆蓋 `S['ccy']`、`S['cur']`、`S['asof']` 等個別欄位（例如 ETF 或港仙列示）；**唔好再自己包 `lib.page`**。價位小數仍固定兩位（警報價行要保留 `.00` 先解析到）。
+`gen.MARKETS` 按代號自動判斷市場（字母＝US、5 位數字＝HK、6 位＝KR、4 位＝JP），默認設好收市時間、幣別（HKD／JPY／KRW；`HK$`／`¥`／`₩`）、資料源字眼（Yahoo）、機構資料字眼、覆蓋率字眼、冇本地大盤報告嘅 `mkt_ref`；`lib.localize()` 喺 `page()` 內自動將 `USD`／`$12.3`／範本句「成交量用 Longbridge」／`13F／Form 4`／`覆蓋率 100%`／TradingView 均線對照句換成對應市場版本。work 檔只需要喺 `spec()` 入面覆蓋 `S['ccy']`、`S['cur']`、`S['asof']` 等個別欄位（例如 ETF 或港仙列示）；**唔好再自己包 `lib.page`**。價位小數仍固定兩位（警報價行要保留 `.00` 先解析到）。
 
 ## 每日跨股總表（自動化，`daily.py`）
 ```

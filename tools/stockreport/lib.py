@@ -280,8 +280,8 @@ def localize(h, S):
     ccy, cur = S.get('ccy', 'USD'), S.get('cur', '$')
     if ccy != 'USD': h = h.replace('USD', ccy)
     if cur != '$': h = re.sub(r'(?<![A-Za-z])\$(?=\d)', lambda _: cur, h)
-    if S.get('src_name', 'Longbridge') != 'Longbridge':     # 只換範本預設嘅資料來源字眼；「Longbridge 核實／MCP／直連／日曆」照留
-        h = re.sub(r'Longbridge(?!\s*(?:MCP|核實|直連|財經日曆|日曆|API|lbcheck))', lambda _: S['src_name'], h)
+    if S.get('src_name', 'Longbridge') != 'Longbridge':     # 只換範本預設嘅資料來源句；worker 自己寫嘅「Longbridge」（核實、MCP、並列）照留
+        h = h.replace('成交量用 Longbridge', '成交量用 ' + S['src_name'])
     if S.get('smart_hard', '13F／Form 4') != '13F／Form 4': h = h.replace('13F／Form 4', S['smart_hard'])
     if S.get('cov', '覆蓋率 100%') != '覆蓋率 100%': h = h.replace('覆蓋率 100%', S['cov'])
     if S.get('ma_chk'): h = h.replace('同 TradingView 圖示一致到兩位小數', S['ma_chk'])
