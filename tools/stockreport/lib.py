@@ -280,7 +280,8 @@ def localize(h, S):
     ccy, cur = S.get('ccy', 'USD'), S.get('cur', '$')
     if ccy != 'USD': h = h.replace('USD', ccy)
     if cur != '$': h = re.sub(r'(?<![A-Za-z])\$(?=\d)', lambda _: cur, h)
-    if S.get('src_name', 'Longbridge') != 'Longbridge': h = h.replace('Longbridge', S['src_name'])
+    if S.get('src_name', 'Longbridge') != 'Longbridge':     # 只換範本預設嘅資料來源字眼；「Longbridge 核實／MCP／直連／日曆」照留
+        h = re.sub(r'Longbridge(?!\s*(?:MCP|核實|直連|財經日曆|日曆|API|lbcheck))', lambda _: S['src_name'], h)
     if S.get('smart_hard', '13F／Form 4') != '13F／Form 4': h = h.replace('13F／Form 4', S['smart_hard'])
     if S.get('cov', '覆蓋率 100%') != '覆蓋率 100%': h = h.replace('覆蓋率 100%', S['cov'])
     if S.get('ma_chk'): h = h.replace('同 TradingView 圖示一致到兩位小數', S['ma_chk'])
@@ -291,16 +292,27 @@ def page(title, body, S=None):
 
 # ---- 朗讀稿用：數字→口語中文
 D = '零一二三四五六七八九'
+def _zh4(n):      # 0–9999
+    s, zero = '', False
+    for u, name in ((1000, '千'), (100, '百'), (10, '十'), (1, '')):
+        q, n = divmod(n, u)
+        if q:
+            if zero: s += '零'
+            s += D[q] + name; zero = False
+        elif s: zero = True
+    return s
 def zhint(n):
     n = int(n)
     if n == 0: return '零'
-    s = ''
-    h, r = divmod(n, 100); t, o = divmod(r, 10)
-    if h: s += D[h] + '百'
-    if t: s += ('' if (t == 1 and not h) else D[t]) + '十'
-    elif h and o: s += '零'
-    if o: s += D[o]
-    return s
+    out, need0 = '', False
+    for u, name in ((10**8, '億'), (10**4, '萬'), (1, '')):
+        q, n = divmod(n, u)
+        if q:
+            if need0 or (out and q < 1000): out += '零'
+            out += _zh4(q) + name; need0 = False
+        elif out: need0 = True
+    if out.startswith('一十'): out = out[1:]
+    return out
 def zh(x, d=2):
     s = f'{abs(x):.{d}f}'; a, b = s.split('.')
     return zhint(a) + '點' + ''.join(D[int(ch)] for ch in b)
