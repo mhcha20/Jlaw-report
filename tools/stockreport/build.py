@@ -20,6 +20,13 @@ gen.DATE_ZH = gen2.DATE_ZH = f'{date}（{wd}）'
 spec_ = importlib.util.spec_from_file_location('work', work); w = importlib.util.module_from_spec(spec_); spec_.loader.exec_module(w)
 m = metrics(t); S = w.spec(m); S = plan_numbers(m, S); T = w.texts(m, S)
 assert len(S['action']) <= 40, ('今日動作超過 40 字', len(S['action']))
+# 分數同評等要對應（用戶 2026-11-05 決定：每 20 分一級＝九構面平均星數四捨五入；同 jlawreportgenerate 網站一致）
+BANDS = [(90, 5, '強烈買入'), (70, 4, '值得買入'), (50, 3, '觀察'), (30, 2, '不建議'), (0, 1, '避免交易')]
+_st, _nm = next((st, nm) for lo, st, nm in BANDS if S['score'] >= lo)
+_want = '★' * _st + ' ' + _nm
+assert S.get('stars') == _st and ' '.join(str(S.get('rating', '')).split()) == _want, (
+    f'評等同分數唔對應：分數 {S["score"]:.1f}／100 應該係「{_want}」（★ <30｜★★ 30–49｜★★★ 50–69｜★★★★ 70–89｜★★★★★ ≥90），'
+    f'而家 rating={S.get("rating")!r} stars={S.get("stars")}；照分數改評等，或者逐格覆核九構面星數')
 if not CARD_ONLY: assert len(T['script3']) <= 950 and len(T['scriptfull']) <= 3500, '朗讀稿超出字數上限'
 os.makedirs('out', exist_ok=True)
 names = {'card': f'{date}_{t}_行動卡', 'rep': f'{date}_{t}_股票分析終極報告', 'app': f'{date}_{t}_核對附錄'}
