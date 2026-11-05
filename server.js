@@ -619,6 +619,13 @@ const SHOT_MONS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep"
 const shotCache = new Map();
 const shotLabel = iso => { const [y, m, d] = iso.split("-"); return `${d} ${SHOT_MONS[+m - 1]} ${y}`; };
 const shotIso = name => { const m = String(name || "").trim().match(/^(\d{1,2}) ([a-z]{3}) (\d{4})$/i); if (!m) return ""; const mi = SHOT_MONS.indexOf(m[2].toLowerCase()); return mi < 0 ? "" : `${m[3]}-${String(mi + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`; };
+const hkIso = d => new Intl.DateTimeFormat("en-CA", {timeZone: "Asia/Hong_Kong", year: "numeric", month: "2-digit", day: "2-digit"}).format(d);
+const hkWeekday = d => new Intl.DateTimeFormat("en-US", {timeZone: "Asia/Hong_Kong", weekday: "short"}).format(d);
+function shotDateChoices(marketDates) {
+  const now = new Date(), wd = hkWeekday(now);
+  const extra = wd === "Sat" ? hkIso(new Date(now.getTime() - 86400000)) : wd === "Sun" ? hkIso(new Date(now.getTime() - 2 * 86400000)) : hkIso(now);
+  return [...new Set([extra, ...marketDates])].filter(Boolean).sort().reverse().slice(0, 21);
+}
 const shotRange = (a, b) => { const o = []; for (let i = a; i <= b; i++) o.push(i); return o; };
 function classifyShots(ticker, files) {
   const pngs = (files || []).filter(f => /\.png$/i.test(f.name));
@@ -658,7 +665,7 @@ async function shotCheck(date, fresh) {
   const label = shotLabel(iso);
   const mFolder = marketKids.find(f => f.mimeType === "application/vnd.google-apps.folder" && f.name.toLowerCase() === label);
   let market;
-  if (!mFolder) market = {ok: false, folder: false, id: "", have: 0, need: MSHOTS.length, missing: MSHOTS.slice(), extra: [], files: 0};
+  if (!mFolder) market = {ok: false, folder: false, id: "", have: 0, need: MSHOTS.length, missing: [], extra: [], files: 0};
   else {
     const fs = await listRetry(mFolder.id);
     const got = {};
@@ -682,7 +689,7 @@ async function shotCheck(date, fresh) {
     else rows.push(r);
   });
   const count = k => rows.filter(r => r.status === k).length;
-  const body = {date: iso, label, at: new Date().toISOString(), ms: Date.now() - t0, dates: marketDates.slice(0, 21), market, stocks: {total: tickers.length, ok: count("ok"), incomplete: count("incomplete"), none: count("none"), errors: errors.length, rows, errorsList: errors}};
+  const body = {date: iso, label, at: new Date().toISOString(), ms: Date.now() - t0, dates: shotDateChoices(marketDates), market, stocks: {total: tickers.length, ok: count("ok"), incomplete: count("incomplete"), none: count("none"), errors: errors.length, rows, errorsList: errors}};
   const entry = {at: Date.now(), body};
   shotCache.set(iso, entry);
   if (!date) shotCache.set("*", entry);

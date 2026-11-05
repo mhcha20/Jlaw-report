@@ -54,7 +54,7 @@
 - `tools/stockreport/`：**V2.0 個股報告生成器**（行動卡／本體報告 9 頁／核對附錄／每日跨股總表），版面照群組 HPE 本體報告範本；九構面＝趨勢、成交量、圖形、Momentum、基本面、市場配合、機構支持、Pullback、Breakout，分數＝星數÷45×100；均量不含當日；雜訊被掃率＝60 日、5 日窗口。用法、spec 欄位、同 `signals.js` 對版嘅行動卡格式約定見該目錄 `README.md`。上載：`POST /api/upload?name=<檔名>.pdf&cat=auto`（檔名含「行動卡／核對附錄／股票分析／每日跨股總表」自動分類）。
 
 ## 截圖檢查（📸 分頁，公開）
-- `GET /api/shots`（`?date=YYYY-MM-DD` 可選，省略＝大盤截圖根資料夾最新一個日期；`?fresh=1` 跳過 45 秒快取）。即時用 `DRIVE_API_KEY` 讀 Drive，唔使管理員密碼。
+- `GET /api/shots`（`?date=YYYY-MM-DD` 可選，省略＝大盤截圖根資料夾最新一個日期；`?fresh=1` 跳過 45 秒快取）。日期選單＝大盤日期資料夾，再加香港今日（週六日改用上星期五），所以亞洲盤先上載、美股大盤未有資料夾都揀到。即時用 `DRIVE_API_KEY` 讀 Drive，唔使管理員密碼。大盤未有該日資料夾只顯示「未有」，唔當 19 張全缺。
 - 大盤根 `1M8hNhlePL5MHD-_SvGZlQ02srBHFq_rl`，日期資料夾 `DD mon YYYY`，要齊 19 張 `NN_TICKER_Daily.png`（IWM VIX SPY QQQ SOX、11 板塊、DXY、GC1!、US10Y）。
 - 個股根 `1xkPBlGhK0SEn2dGIzAINQNIFL33m0hG_`，每個代號資料夾入面同名日期資料夾。規則同 `tools/stockreport/drive.py`：美股要啱啱 01–17；檔名有 `Fund_` 當 ETF，要啱啱 01–12；全數字代號當亞洲，01–14 齊就得（15 內部人可缺）。冇嗰日資料夾＝未有，唔當未齊。
 - 網頁「📸 截圖檢查」一入就檢查，可改日期、按市場篩、複製／WhatsApp 欠嘅清單。改規則要同 `drive.py` 一齊改。
