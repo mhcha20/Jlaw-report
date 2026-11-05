@@ -5,6 +5,7 @@ function parseYahoo(j) {
   const r = j && j.chart && j.chart.result && j.chart.result[0];
   if (!r || !r.timestamp || !r.indicators || !r.indicators.quote || !r.indicators.quote[0]) return null;
   const q = r.indicators.quote[0], out = [];
+  fillMissingClose(r, q);
   r.timestamp.forEach((ts, i) => {
     if (q.open[i] == null || q.close[i] == null) return;
     out.push({d: new Date(ts * 1000).toISOString().slice(0, 10), o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i]});   // 日線時間戳係該市場開市時間（美股 UTC 13:30／14:30、港股 01:30、日韓 00:00），UTC 日期＝交易日
@@ -12,10 +13,31 @@ function parseYahoo(j) {
   return out.length ? out : null;
 }
 // 完整日線（含成交量），供個股報告生成器用：range=2y；回傳 {d,o,h,l,c,v}（v 單位：股）
+// Yahoo 有時（亞洲股多見）當日日線 bar 有開高低同成交量但 close 係 null（例：0066.HK 2026-11-05），咁 bar 會被略過、行情「停喺」前一日。
+// 補救：最後一根 close 缺、而 meta.regularMarketTime 喺 bar 開市時間 6.4 個鐘之後（港／日／韓／美正常時段都係 6.5 個鐘）＝已收市，
+// 就用 meta.regularMarketPrice 做收市價（高低按佢擴闊）。未收市（盤中）唔補，避免用盤中價當收市。
+function fillMissingClose(r, q, nowSec = Date.now() / 1000) {
+  const n = r.timestamp.length - 1, m = r.meta || {};
+  if (n < 0 || q.close[n] != null) return;
+  // 全日冇成交（極少成交股，例：0077.HK 2026-11-05）：成個 bar 都係 null。已過收市就照 Yahoo 自己做法補一根平盤、成交 0 嘅 bar（用上一個收市價）
+  if (q.open[n] == null && q.high[n] == null && q.low[n] == null && q.volume[n] == null) {
+    const prev = q.close.slice(0, n).reverse().find(x => x != null);
+    const age = nowSec - r.timestamp[n];
+    if (prev != null && age >= 6.6 * 3600 && age <= 30 * 3600 && !(typeof m.regularMarketTime === "number" && m.regularMarketTime > r.timestamp[n])) {
+      q.open[n] = q.high[n] = q.low[n] = q.close[n] = prev; q.volume[n] = 0;
+    }
+    return;
+  }
+  if (q.open[n] == null || q.volume[n] == null) return;
+  const px = m.regularMarketPrice, at = m.regularMarketTime;
+  if (typeof px !== "number" || typeof at !== "number" || at - r.timestamp[n] < 6.4 * 3600 || at - r.timestamp[n] > 20 * 3600) return;
+  q.close[n] = px; q.high[n] = Math.max(q.high[n] ?? px, px); q.low[n] = Math.min(q.low[n] ?? px, px);
+}
 function parseYahooFull(j) {
   const r = j && j.chart && j.chart.result && j.chart.result[0];
   if (!r || !r.timestamp || !r.indicators || !r.indicators.quote || !r.indicators.quote[0]) return null;
   const q = r.indicators.quote[0], out = [];
+  fillMissingClose(r, q);
   r.timestamp.forEach((ts, i) => {
     if (q.open[i] == null || q.close[i] == null || q.volume[i] == null) return;
     out.push({d: new Date(ts * 1000).toISOString().slice(0, 10), o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i], v: q.volume[i]});
