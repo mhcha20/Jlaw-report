@@ -14,7 +14,7 @@ def spec(m):
      'lo52_date': 'TODO',
      'prior': 'TODO',
      'prior_cl': 0,
-     'rating': 'TODO',
+     'rating': 'TODO',   # 連星，要同分數對應：★ 避免交易 <30｜★★ 不建議 30–49｜★★★ 觀察 50–69｜★★★★ 值得買入 70–89｜★★★★★ 強烈買入 ≥90（build.py 會擋）
      'stars': 0,
      'sub': 'TODO',
      'dims': [('TODO', 0, 'TODO'),
