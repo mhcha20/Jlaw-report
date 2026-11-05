@@ -494,7 +494,7 @@ const shotRanges = nums => {
   }
   return out.join("、");
 };
-const shotLayout = r => r.layout === "etf" ? "ETF 12 張" : r.layout === "asia" ? "亞洲 14 張" : "美股 17 張";
+const shotLayout = r => r.layout === "etf" ? "ETF 12 張" : r.layout === "asia" ? "亞洲 14 張" : r.layout === "foreign" ? "外國股 16 張（冇內部人）" : "美股 17 張";
 const shotFolder = id => id ? "https://drive.google.com/drive/folders/" + id : "";
 async function loadShots(force, date){
   if(shots.loading) return;

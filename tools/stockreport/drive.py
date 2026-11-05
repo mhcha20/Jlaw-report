@@ -2,7 +2,7 @@
 """drive.py — 唔使 Drive 連接器：經 jlaw-report 網站 API 做 Drive 查詢／下載／放入垃圾桶／上載。
   drive.py ls <folderId>                      列出資料夾子項（id,name,mimeType）
   drive.py datefolder <tickerFolderId> "22 oct 2026"   搵日期子資料夾 id
-  drive.py shots <dateFolderId> <outDir>      數截圖（要 01–17 齊）並全部下載到 outDir；齊先印 OK
+  drive.py shots <dateFolderId> <outDir> [--asia|--foreign]  數截圖（要 01–17 齊；--asia 01–14；--foreign 外國股 15 內部人可缺）並全部下載到 outDir；齊先印 OK
   drive.py tickerfolder <ticker>              喺個股截圖根資料夾搵 ticker 子資料夾 id
   drive.py reports <TICKER> <YYYY-MM-DD>      網站已有嘅該股該日報告（cat,id,name）
   drive.py latest <ticker> [beforeDate]       最近一份行動卡／本體報告（可下載 PDF 到 --out）
@@ -38,9 +38,10 @@ def main():
         nums = sorted(int(x['name'][:2]) for x in fs if re.match(r'\d\d_', x['name']))
         etf = any('Fund_' in x['name'] for x in fs)   # ETF 版面：01–05 技術圖＋06–12 Fund_*（共 12 張）
         asia = '--asia' in a   # 港股／日股／韓股個股：冇內部人（15），部分冇預測／估值（16、17）→ 只要求 01–14
-        need = list(range(1, 13)) if etf else list(range(1, 15)) if asia else list(range(1, 18))
-        ok = all(n in nums for n in need) if asia and not etf else nums == need
-        print(('OK' if ok else 'INCOMPLETE') + (' (ETF 12 張版面)' if etf and ok else '') + (' (亞洲個股版面)' if asia and ok and not etf else ''), len(fs), '張；缺：', sorted(set(range(1, 18)) - set(nums)) if asia and not etf else sorted(set(need) - set(nums)))
+        foreign = '--foreign' in a and not etf and not asia   # 外國股（prices.js OVERRIDE：NESN SCHN ATD MC）：冇美國內部人申報 → 15 可缺
+        need = list(range(1, 13)) if etf else list(range(1, 15)) if asia else [n for n in range(1, 18) if n != 15] if foreign else list(range(1, 18))
+        ok = (all(n in nums for n in need) and all(n <= 17 for n in nums)) if foreign else all(n in nums for n in need) if asia and not etf else nums == need
+        print(('OK' if ok else 'INCOMPLETE') + (' (ETF 12 張版面)' if etf and ok else '') + (' (亞洲個股版面)' if asia and ok and not etf else '') + (' (外國股版面，15 內部人可缺)' if foreign and ok else ''), len(fs), '張；缺：', sorted(set(range(1, 18)) - set(nums)) if (asia and not etf) or foreign else sorted(set(need) - set(nums)))
         if ok and len(a) > 2 and not a[2].startswith('--'):
             os.makedirs(a[2], exist_ok=True)
             for x in fs:
