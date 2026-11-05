@@ -56,5 +56,5 @@
 ## 截圖檢查（📸 分頁，公開）
 - `GET /api/shots`（`?date=YYYY-MM-DD` 可選，省略＝大盤截圖根資料夾最新一個日期；`?fresh=1` 跳過 45 秒快取）。日期選單＝大盤日期資料夾，再加香港今日（週六日改用上星期五），所以亞洲盤先上載、美股大盤未有資料夾都揀到。即時用 `DRIVE_API_KEY` 讀 Drive，唔使管理員密碼。大盤未有該日資料夾只顯示「未有」，唔當 19 張全缺。
 - 大盤根 `1M8hNhlePL5MHD-_SvGZlQ02srBHFq_rl`，日期資料夾 `DD mon YYYY`，要齊 19 張 `NN_TICKER_Daily.png`（IWM VIX SPY QQQ SOX、11 板塊、DXY、GC1!、US10Y）。
-- 個股根 `1xkPBlGhK0SEn2dGIzAINQNIFL33m0hG_`，每個代號資料夾入面同名日期資料夾。規則同 `tools/stockreport/drive.py`：美股要啱啱 01–17；檔名有 `Fund_` 當 ETF，要啱啱 01–12；全數字代號當亞洲，01–14 齊就得（15 內部人可缺）。冇嗰日資料夾＝未有，唔當未齊。
+- 個股根 `1xkPBlGhK0SEn2dGIzAINQNIFL33m0hG_`，每個代號資料夾入面同名日期資料夾。規則同 `tools/stockreport/drive.py`：美股要啱啱 01–17；檔名有 `Fund_` 當 ETF，要啱啱 01–12；全數字代號當亞洲，01–14 齊就得（15 內部人可缺）；**外國股**（`prices.js` 嘅 `OVERRIDE`：NESN、SCHN、ATD、MC，用戶 2026-11-05 指出係 ADR，冇內部人資料）01–14、16、17 齊就得，15 可缺（layout `foreign`，`drive.py shots … --foreign`）。新增外國股只要加入 `OVERRIDE`（同 `index.html` 嘅 `MKT_OVERRIDE`），截圖規則自動跟。姊妹網站 `jlawreportgenerate` 用同一份清單（`ADR_TICKERS`）。冇嗰日資料夾＝未有，唔當未齊。
 - 網頁「📸 截圖檢查」一入就檢查，可改日期、按市場篩、複製／WhatsApp 欠嘅清單。改規則要同 `drive.py` 一齊改。

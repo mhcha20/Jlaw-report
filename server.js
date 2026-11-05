@@ -632,10 +632,12 @@ function classifyShots(ticker, files) {
   const nums = [...new Set(pngs.map(f => (f.name.match(/^(\d\d)_/) || [])[1]).filter(Boolean).map(Number))].sort((a, b) => a - b);
   const etf = pngs.some(f => /Fund_/i.test(f.name));
   const asia = !etf && /^\d{4,6}$/.test(ticker);
-  const layout = etf ? "etf" : asia ? "asia" : "us";
-  const needN = etf ? shotRange(1, 12) : asia ? shotRange(1, 14) : shotRange(1, 17);
+  // 外國股（英文字母代號但唔係美國公司，即 prices.js 嘅 OVERRIDE：NESN、SCHN、ATD、MC）冇美國內部人申報 → 第 15 張（內部人）可缺
+  const foreign = !etf && !asia && Object.prototype.hasOwnProperty.call(priceLib.OVERRIDE, String(ticker).toUpperCase());
+  const layout = etf ? "etf" : asia ? "asia" : foreign ? "foreign" : "us";
+  const needN = etf ? shotRange(1, 12) : asia ? shotRange(1, 14) : foreign ? shotRange(1, 17).filter(n => n !== 15) : shotRange(1, 17);
   const missing = needN.filter(n => !nums.includes(n));
-  const extra = asia ? [] : nums.filter(n => !needN.includes(n));
+  const extra = asia ? [] : nums.filter(n => !needN.includes(n) && !(foreign && n === 15));
   return {layout, need: needN.length, have: needN.length - missing.length, missing, extra, files: pngs.length, ok: missing.length === 0 && extra.length === 0};
 }
 async function mapPool(items, n, fn) {

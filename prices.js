@@ -68,4 +68,4 @@ async function fetchOhlcv(ticker, range = "2y") {
   }
   throw new Error(errs.join("; "));
 }
-module.exports = {symbols, fetchBars, fetchOhlcv, parseYahoo, parseStooq};
+module.exports = {symbols, fetchBars, fetchOhlcv, parseYahoo, parseStooq, OVERRIDE};
