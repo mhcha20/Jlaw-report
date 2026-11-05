@@ -2,6 +2,8 @@
 
 給日後對話嘅項目背景。用戶用廣東話溝通，回覆請用廣東話（繁體）。
 
+**所有網站一覽（12 個 repo、Railway project、部署 branch、網址）：`docs/ALL_SITES.md`。**
+
 ## 呢個項目係咩
 - 一個網頁：列出兩個 Google Drive 資料夾入面嘅 PDF 報告，可剔選後經 WhatsApp 分享（連結或直接分享 PDF 檔案），可上傳／隱藏／刪除報告，並有「截圖檢查」（大盤同每隻股票當日截圖齊唔齊）同「覆蓋檢查」比對股票清單表格同 Drive 報告。
 - Drive 資料夾：根目錄 `1AeIL4vlhY5dqij_wtIF9paB0-cadqowE`（每日跨股總表＋子資料夾 行動卡／個股研究報告／核實報告）；大盤分析 `18yWn2hUykKaKru44HavWutfUST9Dux6_`。
