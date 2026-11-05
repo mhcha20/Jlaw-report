@@ -119,6 +119,28 @@
   #cov th:first-child,#cov td:first-child{text-align:left}
   #cov .tk{font-weight:700} #cov .co{font-size:11px;color:var(--mute)} #cov .ok{color:#16a34a} #cov .no{color:#dc2626;font-weight:700}
   #cov .note{font-size:12px;color:var(--mute);margin:6px 0}
+  #shots h3{font-size:15px;margin:14px 0 6px}
+  #shots .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+  #shots select,#shots button,#shots input[type=search]{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit}
+  #shots button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  #shots .sum{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0}
+  #shots .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+  #shots .dt{font-size:18px;font-weight:700}
+  #shots .mut{font-size:12px;color:var(--mute)}
+  #shots .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+  #shots .st{border:1px solid var(--line);border-radius:10px;padding:10px 4px;text-align:center;background:var(--bg)}
+  #shots .st b{display:block;font-size:24px;line-height:1.1}
+  #shots .st span{display:block;font-size:12px;color:var(--mute);margin-top:2px}
+  #shots .st.g b{color:#16a34a} #shots .st.a b{color:#d97706} #shots .st.r b{color:#dc2626}
+  #shots .mk{margin-top:8px;font-size:13px;line-height:1.55}
+  #shots .mk .ok{color:#16a34a;font-weight:700} #shots .mk .no{color:#dc2626;font-weight:700}
+  #shots .card{background:var(--card);border:1px solid var(--line);border-left:5px solid #dc2626;border-radius:12px;padding:10px 12px;margin:8px 0}
+  #shots .card .l1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  #shots .tk{font-weight:700}
+  #shots .pills{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+  #shots .pills a{font-size:13px;font-weight:700;text-decoration:none;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:3px 8px;background:var(--card)}
+  #shots .note{font-size:12px;color:var(--mute);margin:6px 0;line-height:1.55}
+  #shots a.open{color:var(--brand);text-decoration:none;font-size:13px}
   #peer .note{font-size:12px;color:var(--mute);margin:6px 0;line-height:1.6}
   #peer .warnbox{background:var(--card);border:1px solid #d97706;border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.6;margin:8px 0}
   #peer .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
@@ -164,6 +186,7 @@
     <button id="selAll">全選當前</button>
   </div>
   <div id="list"></div>
+  <div id="shots" style="display:none"></div>
   <div id="cov" style="display:none"></div>
   <div id="sig" style="display:none"></div>
   <div id="peer" style="display:none"></div>
@@ -240,19 +263,20 @@ function btns(el, entries, key){
   entries.forEach(([v,label]) => {
     const b = document.createElement("button");
     b.textContent = label; if(state[key]===v) b.className = "on";
-    b.onclick = async () => { if((v === "cov" || v === "peer") && !state.pw){ await doUnlock(); if(!state.pw) return; } state[key]=v; render(); if(v === "cov") loadSheet(false); if(v === "sig") loadSig(false); if(v === "peer") loadPeers(false); };
+    b.onclick = async () => { if((v === "cov" || v === "peer") && !state.pw){ await doUnlock(); if(!state.pw) return; } state[key]=v; render(); if(v === "cov") loadSheet(false); if(v === "sig") loadSig(false); if(v === "peer") loadPeers(false); if(v === "shots") loadShots(false); };
     el.appendChild(b);
   });
 }
 function esc(s){ return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 function render(){
-  btns($("#tabs"), [["all","全部"], ["new","🆕 最新上傳"], ["cov","✅ 覆蓋檢查"], ["sig","📊 買賣訊號"], ["peer","👥 群友對照"], ...Object.entries(CATS)], "cat");
+  btns($("#tabs"), [["all","全部"], ["new","🆕 最新上傳"], ["shots","📸 截圖檢查"], ["cov","✅ 覆蓋檢查"], ["sig","📊 買賣訊號"], ["peer","👥 群友對照"], ...Object.entries(CATS)], "cat");
   btns($("#mkts"), MKTS, "mkt");
-  const isCov = state.cat === "cov", isSig = state.cat === "sig", isPeer = state.cat === "peer";
-  $("#cov").style.display = isCov ? "" : "none"; $("#sig").style.display = isSig ? "" : "none"; $("#peer").style.display = isPeer ? "" : "none";
-  $("#list").style.display = (isCov || isSig || isPeer) ? "none" : ""; document.querySelector(".tools").style.display = (isCov || isSig || isPeer) ? "none" : "";
-  if(isCov || isSig || isPeer){ $("#chips").style.display = "none"; isCov ? renderCov() : isSig ? renderSig() : renderPeer(); updateBar(); return; }
+  const isCov = state.cat === "cov", isSig = state.cat === "sig", isPeer = state.cat === "peer", isShots = state.cat === "shots";
+  const isSpecial = isCov || isSig || isPeer || isShots;
+  $("#cov").style.display = isCov ? "" : "none"; $("#sig").style.display = isSig ? "" : "none"; $("#peer").style.display = isPeer ? "" : "none"; $("#shots").style.display = isShots ? "" : "none";
+  $("#list").style.display = isSpecial ? "none" : ""; document.querySelector(".tools").style.display = isSpecial ? "none" : "";
+  if(isSpecial){ $("#chips").style.display = "none"; isShots ? renderShots() : isCov ? renderCov() : isSig ? renderSig() : renderPeer(); updateBar(); return; }
   const tickers = [...new Set(items.filter(r => !state.deleted.has(r.id) && (state.showHidden || !state.hidden.has(r.id)) && (state.cat==="all" || state.cat==="new" || r.cat===state.cat) && mktOk(mktOf(r.ticker, r.name))).map(r=>r.ticker).filter(Boolean))].sort();
   if(state.ticker!=="all" && !tickers.includes(state.ticker)) state.ticker="all";
   btns($("#chips"), [["all","所有股票"], ...tickers.map(t=>[t,t])], "ticker");
@@ -299,7 +323,7 @@ function message(){
 }
 function updateBar(){
   const n = state.sel.size;
-  $("#bar").classList.toggle("show", n>0 && state.cat!=="cov" && state.cat!=="sig" && state.cat!=="peer");
+  $("#bar").classList.toggle("show", n>0 && state.cat!=="cov" && state.cat!=="sig" && state.cat!=="peer" && state.cat!=="shots");
   $("#cnt").textContent = "已選 " + n + " 份";
   const adm = !!state.pw;
   $("#hide").style.display = adm ? "inline-block" : "none"; $("#del").style.display = adm && state.canDelete ? "inline-block" : "none";
@@ -457,6 +481,92 @@ $("#upfile").onchange = async e => {
   }
   toast((fail.length ? "已上傳 " + ok + " 份，" + fail.length + " 份失敗 — " + fail[0] : "已上傳 " + ok + " 份") + (skipped ? "，跳過 " + skipped + " 份重複" : ""));
 };
+
+// ---- 截圖檢查：大盤 19 張＋每隻股票當日截圖，即時讀 Drive ----
+const shots = {data:null, err:"", loading:false, filter:"bad", q:""};
+const shotRanges = nums => {
+  const s = [...nums].sort((a, b) => a - b); if(!s.length) return "";
+  const out = []; let a = s[0], b = s[0];
+  const p = n => String(n).padStart(2, "0");
+  for(let i = 1; i <= s.length; i++){
+    if(s[i] === b + 1) b = s[i];
+    else { out.push(a === b ? p(a) : p(a) + "–" + p(b)); a = b = s[i]; }
+  }
+  return out.join("、");
+};
+const shotLayout = r => r.layout === "etf" ? "ETF 12 張" : r.layout === "asia" ? "亞洲 14 張" : "美股 17 張";
+const shotFolder = id => id ? "https://drive.google.com/drive/folders/" + id : "";
+async function loadShots(force, date){
+  if(shots.loading) return;
+  if(!force && shots.data && !date){ renderShots(); return; }
+  shots.loading = true; shots.err = ""; renderShots();
+  try {
+    const q = new URLSearchParams();
+    if(date) q.set("date", date);
+    if(force) q.set("fresh", "1");
+    const r = await fetch("/api/shots?" + q);
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error || "檢查失敗");
+    shots.data = j;
+  } catch(e){ shots.err = e.message; }
+  shots.loading = false; renderShots();
+}
+function shotRows(){
+  const d = shots.data; if(!d) return [];
+  const q = shots.q.trim().toLowerCase();
+  return d.stocks.rows.filter(r => mktOk(mktOf(r.ticker)) && (!q || r.ticker.toLowerCase().includes(q)));
+}
+function shotText(rows){
+  const d = shots.data, m = d.market;
+  const inc = rows.filter(r => r.status === "incomplete"), none = rows.filter(r => r.status === "none");
+  const err = (d.stocks.errorsList || []).filter(r => mktOk(mktOf(r.ticker)));
+  const lines = ["【" + d.label + " 截圖檢查】", "大盤：" + (m.folder ? (m.ok ? "齊 " + m.have + "/" + m.need : "未齊 " + m.have + "/" + m.need + (m.missing.length ? " 缺 " + m.missing.join("、") : "")) : "未有日期資料夾")];
+  lines.push("個股（依上面市場篩選）：齊 " + rows.filter(r => r.status === "ok").length + "｜未齊 " + inc.length + "｜未有資料夾 " + none.length);
+  if(inc.length) lines.push("", "未齊：", ...inc.map(r => r.ticker + " 缺 " + (shotRanges(r.missing) || "—") + "（" + r.have + "/" + r.need + "）"));
+  if(none.length) lines.push("", "未有資料夾：", none.map(r => r.ticker).join("、"));
+  if(err.length) lines.push("", "讀取失敗：", err.map(r => r.ticker).join("、"));
+  return lines.join("\n");
+}
+function renderShots(){
+  const el = $("#shots"); if(state.cat !== "shots") return;
+  if(shots.loading && !shots.data){ el.innerHTML = '<div class="sum"><div class="dt">即時檢查緊…</div><p class="note">逐個 Drive 資料夾對大盤 19 張同每隻股票嘅截圖，大約 10–30 秒。唔使再人手入每個 folder。</p></div>'; return; }
+  if(shots.err && !shots.data){ el.innerHTML = '<p class="note">⚠ ' + esc(shots.err) + '</p><button id="shotRetry">重試</button>'; $("#shotRetry").onclick = () => loadShots(true); return; }
+  if(!shots.data){ el.innerHTML = '<p class="note">未檢查</p><button id="shotGo">即時檢查</button>'; $("#shotGo").onclick = () => loadShots(true); return; }
+  const d = shots.data, m = d.market, rows = shotRows();
+  const nOk = rows.filter(r => r.status === "ok").length, nInc = rows.filter(r => r.status === "incomplete").length, nNone = rows.filter(r => r.status === "none").length;
+  const fbtn = (k, l) => '<button data-f="' + k + '" class="' + (shots.filter === k ? "on" : "") + '">' + l + '</button>';
+  const showInc = shots.filter === "bad" || shots.filter === "incomplete" || shots.filter === "all";
+  const showNone = shots.filter === "bad" || shots.filter === "none" || shots.filter === "all";
+  const showOk = shots.filter === "ok" || shots.filter === "all";
+  const inc = rows.filter(r => r.status === "incomplete"), none = rows.filter(r => r.status === "none"), ok = rows.filter(r => r.status === "ok"), badErr = (d.stocks.errorsList || []).filter(r => mktOk(mktOf(r.ticker)) && (!shots.q.trim() || r.ticker.toLowerCase().includes(shots.q.trim().toLowerCase())));
+  const pill = r => '<a target="_blank" rel="noopener" href="' + shotFolder(r.folderId) + '">' + esc(r.ticker) + '</a>';
+  const card = r => '<div class="card"><div class="l1"><span class="tk">' + esc(r.ticker) + '</span><span class="no">未齊 ' + r.have + '/' + r.need + '</span></div><div class="mut">' + shotLayout(r) + (r.missing.length ? ' · 缺 ' + shotRanges(r.missing) : '') + (r.extra && r.extra.length ? ' · 多 ' + shotRanges(r.extra) : '') + '</div>' + (r.dateId ? '<a class="open" target="_blank" rel="noopener" href="' + shotFolder(r.dateId) + '">打開當日資料夾</a>' : '') + '</div>';
+  el.innerHTML =
+    '<div class="bar"><button id="shotReload"' + (shots.loading ? " disabled" : "") + '>🔄 即時再檢查</button>' +
+    '<select id="shotDay">' + d.dates.map(x => '<option value="' + x + '"' + (x === d.date ? " selected" : "") + '>' + x + '</option>').join("") + '</select>' +
+    '<input type="search" id="shotQ" placeholder="搜尋代號" value="' + esc(shots.q) + '"></div>' +
+    (shots.loading ? '<p class="note">重新檢查緊…</p>' : '') +
+    (shots.err ? '<p class="note">⚠ ' + esc(shots.err) + '</p>' : '') +
+    '<div class="sum"><div class="hd"><div class="dt">' + esc(d.label) + '</div><div class="mut">' + hkTime(d.at) + ' 檢查 · ' + (d.ms/1000).toFixed(0) + ' 秒</div></div>' +
+    '<div class="mk">大盤 ' + (m.ok ? '<span class="ok">齊 ' + m.have + '/' + m.need + '</span>' : '<span class="no">' + (m.folder ? '未齊 ' + m.have + '/' + m.need : '未有日期資料夾') + '</span>') +
+    (m.missing.length ? ' · 缺 ' + esc(m.missing.join("、")) : '') +
+    (m.extra.length ? ' · 多 ' + esc(m.extra.join("、")) : '') +
+    (m.id ? ' · <a class="open" target="_blank" rel="noopener" href="' + shotFolder(m.id) + '">打開大盤資料夾</a>' : '') + '</div>' +
+    '<div class="stats"><div class="st g"><b>' + nOk + '</b><span>個股齊</span></div><div class="st a"><b>' + nInc + '</b><span>未齊</span></div><div class="st r"><b>' + nNone + '</b><span>未有資料夾</span></div></div></div>' +
+    '<div class="bar">' + fbtn("bad","有問題") + fbtn("incomplete","未齊") + fbtn("none","未有資料夾") + fbtn("ok","齊晒") + fbtn("all","全部") + '<button id="shotCopy">複製欠嘅清單</button><button id="shotWa">WhatsApp</button></div>' +
+    '<p class="note">大盤要 19 張（IWM、VIX、SPY、QQQ、SOX、11 個板塊、DXY、GC1!、US10Y）。美股個股要 01–17；ETF（檔名有 Fund_）要 01–12；港日韓要 01–14（15 內部人可缺）。數字係即時讀 Drive，唔係舊報告。</p>' +
+    (showInc ? '<h3>未齊 ' + inc.length + '</h3>' + (inc.length ? inc.map(card).join("") : '<p class="note">冇</p>') : '') +
+    (showNone ? '<h3>未有當日資料夾 ' + none.length + '</h3>' + (none.length ? '<div class="pills">' + none.map(pill).join("") + '</div>' : '<p class="note">冇</p>') : '') +
+    (badErr.length && (shots.filter === "bad" || shots.filter === "all") ? '<h3>讀取失敗 ' + badErr.length + '</h3><div class="pills">' + badErr.map(r => pill({ticker:r.ticker, folderId:r.folderId})).join("") + '</div>' : '') +
+    (showOk ? '<h3>齊晒 ' + ok.length + '</h3>' + (ok.length ? '<div class="pills">' + ok.map(pill).join("") + '</div>' : '<p class="note">冇</p>') : '');
+  el.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { shots.filter = b.dataset.f; renderShots(); });
+  $("#shotReload").onclick = () => loadShots(true, d.date);
+  $("#shotDay").onchange = e => loadShots(true, e.target.value);
+  $("#shotQ").oninput = e => { shots.q = e.target.value; shots._pos = e.target.selectionStart; shots._focus = true; renderShots(); shots._focus = false; };
+  $("#shotCopy").onclick = async () => { try{ await navigator.clipboard.writeText(shotText(rows)); toast("已複製"); }catch(e){ toast("複製失敗"); } };
+  $("#shotWa").onclick = () => window.open("https://wa.me/?text=" + encodeURIComponent(shotText(rows)), "_blank", "noopener");
+  const qEl = $("#shotQ"); if(qEl && shots._focus){ qEl.focus(); const n = shots._pos == null ? qEl.value.length : shots._pos; qEl.setSelectionRange(n, n); }
+}
 
 // ---- 覆蓋檢查：表格股票清單 vs Drive 報告 ----
 const cov = {sheet:null, err:"", loading:false, scope:"day", day:"", since:"2026-10-01", filter:"miss"};

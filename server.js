@@ -611,6 +611,84 @@ async function admin(req, res, p) {
   json(res, 404, {error: "not found"});
 }
 
+// ---- 截圖齊唔齊（公開唯讀，同 drive.py shots／market-shots 同一套規則）----
+const SHOT_MROOT = "1M8hNhlePL5MHD-_SvGZlQ02srBHFq_rl"; // 大盤截圖，按日期分子資料夾
+const SHOT_SROOT = "1xkPBlGhK0SEn2dGIzAINQNIFL33m0hG_"; // 個股截圖根資料夾
+const MSHOTS = ["IWM", "VIX", "SPY", "QQQ", "SOX", "XLK", "XLF", "XLE", "XLV", "XLY", "XLB", "XLC", "XLI", "XLP", "XLU", "XLRE", "DXY", "GC1!", "US10Y"];
+const SHOT_MONS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const shotCache = new Map();
+const shotLabel = iso => { const [y, m, d] = iso.split("-"); return `${d} ${SHOT_MONS[+m - 1]} ${y}`; };
+const shotIso = name => { const m = String(name || "").trim().match(/^(\d{1,2}) ([a-z]{3}) (\d{4})$/i); if (!m) return ""; const mi = SHOT_MONS.indexOf(m[2].toLowerCase()); return mi < 0 ? "" : `${m[3]}-${String(mi + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`; };
+const shotRange = (a, b) => { const o = []; for (let i = a; i <= b; i++) o.push(i); return o; };
+function classifyShots(ticker, files) {
+  const pngs = (files || []).filter(f => /\.png$/i.test(f.name));
+  const nums = [...new Set(pngs.map(f => (f.name.match(/^(\d\d)_/) || [])[1]).filter(Boolean).map(Number))].sort((a, b) => a - b);
+  const etf = pngs.some(f => /Fund_/i.test(f.name));
+  const asia = !etf && /^\d{4,6}$/.test(ticker);
+  const layout = etf ? "etf" : asia ? "asia" : "us";
+  const needN = etf ? shotRange(1, 12) : asia ? shotRange(1, 14) : shotRange(1, 17);
+  const missing = needN.filter(n => !nums.includes(n));
+  const extra = asia ? [] : nums.filter(n => !needN.includes(n));
+  return {layout, need: needN.length, have: needN.length - missing.length, missing, extra, files: pngs.length, ok: missing.length === 0 && extra.length === 0};
+}
+async function mapPool(items, n, fn) {
+  const out = new Array(items.length); let i = 0;
+  await Promise.all(Array.from({length: Math.min(n, items.length)}, async () => {
+    while (i < items.length) { const k = i++; try { out[k] = await fn(items[k], k); } catch (e) { out[k] = {error: e.message}; } }
+  }));
+  return out;
+}
+async function listRetry(id) {
+  let last;
+  for (let i = 0; i < 3; i++) {
+    try { return await list(id); }
+    catch (e) { last = e; await new Promise(r => setTimeout(r, 350 * (i + 1))); }
+  }
+  throw last;
+}
+async function shotCheck(date, fresh) {
+  if (!KEY) { const e = new Error("DRIVE_API_KEY not set"); e.code = 503; throw e; }
+  const cached = shotCache.get(date || "*");
+  if (!fresh && cached && Date.now() - cached.at < 45000) return cached.body;
+  const t0 = Date.now();
+  const marketKids = await listRetry(SHOT_MROOT);
+  const marketDates = marketKids.map(f => shotIso(f.name)).filter(Boolean).sort().reverse();
+  const iso = date || marketDates[0];
+  if (!iso) { const e = new Error("大盤截圖資料夾未有日期"); e.code = 404; throw e; }
+  const label = shotLabel(iso);
+  const mFolder = marketKids.find(f => f.mimeType === "application/vnd.google-apps.folder" && f.name.toLowerCase() === label);
+  let market;
+  if (!mFolder) market = {ok: false, folder: false, id: "", have: 0, need: MSHOTS.length, missing: MSHOTS.slice(), extra: [], files: 0};
+  else {
+    const fs = await listRetry(mFolder.id);
+    const got = {};
+    for (const f of fs) { const mt = f.name.match(/^(\d\d)_(.+)_Daily\.png$/i); if (mt) got[mt[2]] = true; }
+    const missing = MSHOTS.filter(t => !got[t]);
+    const extra = Object.keys(got).filter(t => !MSHOTS.includes(t));
+    market = {ok: missing.length === 0, folder: true, id: mFolder.id, have: MSHOTS.length - missing.length, need: MSHOTS.length, missing, extra, files: fs.filter(f => /\.png$/i.test(f.name)).length};
+  }
+  const tickers = (await listRetry(SHOT_SROOT)).filter(f => f.mimeType === "application/vnd.google-apps.folder" && /^[A-Z0-9]{1,8}$/i.test(f.name));
+  const checked = await mapPool(tickers, 8, async f => {
+    const kids = await listRetry(f.id);
+    const day = kids.find(k => k.mimeType === "application/vnd.google-apps.folder" && k.name.toLowerCase() === label);
+    if (!day) return {ticker: f.name, status: "none", layout: /^\d{4,6}$/.test(f.name) ? "asia" : "us", have: 0, need: 0, missing: [], extra: [], files: 0, folderId: f.id, dateId: ""};
+    const shots = await listRetry(day.id);
+    const c = classifyShots(f.name, shots);
+    return {ticker: f.name, status: c.ok ? "ok" : "incomplete", ...c, folderId: f.id, dateId: day.id};
+  });
+  const rows = []; const errors = [];
+  checked.forEach((r, i) => {
+    if (!r || r.error) errors.push({ticker: tickers[i].name, error: (r && r.error) || "未知錯誤", folderId: tickers[i].id});
+    else rows.push(r);
+  });
+  const count = k => rows.filter(r => r.status === k).length;
+  const body = {date: iso, label, at: new Date().toISOString(), ms: Date.now() - t0, dates: marketDates.slice(0, 21), market, stocks: {total: tickers.length, ok: count("ok"), incomplete: count("incomplete"), none: count("none"), errors: errors.length, rows, errorsList: errors}};
+  const entry = {at: Date.now(), body};
+  shotCache.set(iso, entry);
+  if (!date) shotCache.set("*", entry);
+  return body;
+}
+
 http.createServer(async (req, res) => {
   const p = req.url.split("?")[0];
   const url = new URL(req.url, "http://x");
@@ -642,6 +720,11 @@ http.createServer(async (req, res) => {
       }
       json(res, 200, {folder: fid, files: out});
     })().catch(e => json(res, 502, {error: e.message}));
+  }
+  if (p === "/api/shots" && req.method === "GET") {   // 公開唯讀：即時對大盤 19 張＋每隻股票當日截圖齊唔齊
+    const date = url.searchParams.get("date") || "";
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return json(res, 400, {error: "日期要 YYYY-MM-DD"});
+    return shotCheck(date, url.searchParams.get("fresh") === "1").then(b => json(res, 200, b)).catch(e => { console.error("shots failed", e.message); json(res, e.code || 502, {error: e.message}); });
   }
   if (p === "/api/peers" || p === "/api/peers/refresh" || p === "/api/peers/pdf") return peersApi(req, res, p, url).catch(e => { console.error("peers failed", e.message); if (!res.headersSent) json(res, 502, {error: e.message}); else res.destroy(); });
   if (p === "/api/sheet" && req.method === "GET") return sheetCsv(req, res).catch(e => { console.error("sheet failed", e.message); json(res, 500, {error: e.message}); });

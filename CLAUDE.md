@@ -3,7 +3,7 @@
 給日後對話嘅項目背景。用戶用廣東話溝通，回覆請用廣東話（繁體）。
 
 ## 呢個項目係咩
-- 一個網頁：列出兩個 Google Drive 資料夾入面嘅 PDF 報告，可剔選後經 WhatsApp 分享（連結或直接分享 PDF 檔案），可上傳／隱藏／刪除報告，並有「覆蓋檢查」比對股票清單表格同 Drive 報告。
+- 一個網頁：列出兩個 Google Drive 資料夾入面嘅 PDF 報告，可剔選後經 WhatsApp 分享（連結或直接分享 PDF 檔案），可上傳／隱藏／刪除報告，並有「截圖檢查」（大盤同每隻股票當日截圖齊唔齊）同「覆蓋檢查」比對股票清單表格同 Drive 報告。
 - Drive 資料夾：根目錄 `1AeIL4vlhY5dqij_wtIF9paB0-cadqowE`（每日跨股總表＋子資料夾 行動卡／個股研究報告／核實報告）；大盤分析 `18yWn2hUykKaKru44HavWutfUST9Dux6_`。
 - 股票清單 Google Sheet（第一個分頁「個股 research list」）：`1da207nad2cL2hN4vRLNtsOt2UXwgVTzMvoXS3VF98Fw`。
 
@@ -52,3 +52,9 @@
 - `docs/jlaw-method-notes.md`：**J Law 技術分析／交易方法筆記**（由用戶上傳嘅 51 頁 MYT 文件整理：VCP、拉回買入、swing trade、M.E.T.A. 九大優勢、S&R、趨勢線／通道、移動平均線、見頂四訊號、見底八訊號、套牢處理、選股流程）。用戶會就呢份資料跟進，處理相關問題前請先讀。
 - `tools/stockreport/`：**只出行動卡模式**：`build.py T D work.py --card`（work 檔用 `template_card.py`，texts 只需 biggest／cost_tail／corr／foot；流程見 `WORKER_CARD.md`）。非重點股用呢個模式出卡入訊號／回測；**用量要慳**（用戶 2026-10-29）：只有 12:47 最後一輪做，每日最多 5 隻，揀最耐冇更新 V2.0 卡嘅股票輪流（每張卡約 15 萬 token）。
 - `tools/stockreport/`：**V2.0 個股報告生成器**（行動卡／本體報告 9 頁／核對附錄／每日跨股總表），版面照群組 HPE 本體報告範本；九構面＝趨勢、成交量、圖形、Momentum、基本面、市場配合、機構支持、Pullback、Breakout，分數＝星數÷45×100；均量不含當日；雜訊被掃率＝60 日、5 日窗口。用法、spec 欄位、同 `signals.js` 對版嘅行動卡格式約定見該目錄 `README.md`。上載：`POST /api/upload?name=<檔名>.pdf&cat=auto`（檔名含「行動卡／核對附錄／股票分析／每日跨股總表」自動分類）。
+
+## 截圖檢查（📸 分頁，公開）
+- `GET /api/shots`（`?date=YYYY-MM-DD` 可選，省略＝大盤截圖根資料夾最新一個日期；`?fresh=1` 跳過 45 秒快取）。即時用 `DRIVE_API_KEY` 讀 Drive，唔使管理員密碼。
+- 大盤根 `1M8hNhlePL5MHD-_SvGZlQ02srBHFq_rl`，日期資料夾 `DD mon YYYY`，要齊 19 張 `NN_TICKER_Daily.png`（IWM VIX SPY QQQ SOX、11 板塊、DXY、GC1!、US10Y）。
+- 個股根 `1xkPBlGhK0SEn2dGIzAINQNIFL33m0hG_`，每個代號資料夾入面同名日期資料夾。規則同 `tools/stockreport/drive.py`：美股要啱啱 01–17；檔名有 `Fund_` 當 ETF，要啱啱 01–12；全數字代號當亞洲，01–14 齊就得（15 內部人可缺）。冇嗰日資料夾＝未有，唔當未齊。
+- 網頁「📸 截圖檢查」一入就檢查，可改日期、按市場篩、複製／WhatsApp 欠嘅清單。改規則要同 `drive.py` 一齊改。
