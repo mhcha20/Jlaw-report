@@ -294,6 +294,7 @@ function mergeOhlcv(t, rows) {
   try { old = JSON.parse(fs.readFileSync(f, "utf8")); } catch {}
   const m = new Map(old.map(r => [r.d, r])); for (const r of rows) m.set(r.d, {...r, fa: now});
   const out = [...m.values()].sort((a, b) => a.d < b.d ? -1 : 1).slice(-800);
+  priceLib.fixScale(out);   // 快取入面舊嘅錯 bar（Yahoo 價格比例錯）都一齊還原
   try { fs.writeFileSync(f, JSON.stringify(out)); } catch (e) { console.error("ohlcv save failed", e.message); }
   return out;
 }

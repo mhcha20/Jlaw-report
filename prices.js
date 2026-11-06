@@ -33,6 +33,26 @@ function fillMissingClose(r, q, nowSec = Date.now() / 1000) {
   if (typeof px !== "number" || typeof at !== "number" || at - r.timestamp[n] < 6.4 * 3600 || at - r.timestamp[n] > 20 * 3600) return;
   q.close[n] = px; q.high[n] = Math.max(q.high[n] ?? px, px); q.low[n] = Math.min(q.low[n] ?? px, px);
 }
+// Yahoo 間中有幾日價格細咗／大咗 10、100、1000 倍，成交量反方向放大（2026-11-06 報告生成器日本大盤報告 AI 發現：
+// 1321.T 2026-10-05／06 收 7.28／7.35，正常約 710，量大 100 倍；1306.T 2026-03-30／31 收 37.6／37.1，正常約 383）。
+// 會搞亂均線、52 週高低、50 日均量同回測。同前後各 5 根收市中位數比，比例接近 10 嘅次方（±10%）就將開高低收乘返、成交量除返。
+// 真實急升跌（例 BMNR 2025-06 由 4 元升到過百）唔會啱啱係 10 倍，唔受影響。回傳修正咗嘅日期 list（rows 原地改）。
+function fixScale(rows) {
+  const fixed = [], med = a => { const s = [...a].sort((x, y) => x - y), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; };
+  rows.forEach((x, i) => {
+    const nb = [...rows.slice(Math.max(0, i - 5), i), ...rows.slice(i + 1, i + 6)].map(r => r.c).filter(c => c);
+    if (nb.length < 4 || !x.c) return;
+    const k = med(nb) / x.c;
+    for (const f of [10, 100, 1000, 0.1, 0.01, 0.001]) {
+      if (Math.abs(k / f - 1) <= 0.10) {
+        for (const key of ["o", "h", "l", "c"]) if (x[key] != null) x[key] *= f;
+        if (x.v != null) x.v = Math.round(x.v / f);
+        fixed.push(x.d); break;
+      }
+    }
+  });
+  return fixed;
+}
 function parseYahooFull(j) {
   const r = j && j.chart && j.chart.result && j.chart.result[0];
   if (!r || !r.timestamp || !r.indicators || !r.indicators.quote || !r.indicators.quote[0]) return null;
@@ -42,6 +62,7 @@ function parseYahooFull(j) {
     if (q.open[i] == null || q.close[i] == null || q.volume[i] == null) return;
     out.push({d: new Date(ts * 1000).toISOString().slice(0, 10), o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i], v: q.volume[i]});
   });
+  fixScale(out);
   return out.length ? out : null;
 }
 function parseStooq(t) {
@@ -90,4 +111,4 @@ async function fetchOhlcv(ticker, range = "2y") {
   }
   throw new Error(errs.join("; "));
 }
-module.exports = {symbols, fetchBars, fetchOhlcv, parseYahoo, parseStooq, OVERRIDE};
+module.exports = {symbols, fetchBars, fetchOhlcv, parseYahoo, parseStooq, fixScale, OVERRIDE};
