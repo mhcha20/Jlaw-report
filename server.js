@@ -587,6 +587,24 @@ async function peersApi(req, res, p, url) {
   json(res, 200, {files, state: {...peerState}, ownersAt: peers.ownersAt, ownersErr: peers.ownersErr, googleConnected: googleConnected(), bt: peers.bt || {}, btPx: peers.btPx || {have: 0, failed: 0}, btAt: peers.btAt || 0});
 }
 
+// ---- 自訂股票清單（用戶 2026-11-12：同報告生成網站用同一批清單）----
+// 清單只存喺報告生成網站（jlawreportgenerate /api/watchlist）；呢度伺服器代讀寫，header x-jlaw-admin＝ADMIN_PASSWORD
+// （生成網站嘅 JLAW_ADMIN_PASSWORD 係同一個值）。網頁要先輸入管理員密碼（清單名係私人）。
+const GEN_SITE = (process.env.GEN_SITE || "https://jlawreportgenerate-production.up.railway.app").replace(/\/$/, "");
+async function listsApi(req, res) {
+  if (!ADMIN) return json(res, 503, {error: "未設定 ADMIN_PASSWORD"});
+  const a = authed(req); if (a !== 200) return json(res, a, {error: a === 429 ? "嘗試太多次，請稍後再試" : "密碼錯誤"});
+  const opt = {headers: {"x-jlaw-admin": ADMIN, "Content-Type": "application/json"}, signal: AbortSignal.timeout(20000)};
+  if (req.method === "POST") {
+    let b; try { b = await body(req); } catch (e) { return json(res, 400, {error: "bad request"}); }
+    if (!Array.isArray(b.lists)) return json(res, 400, {error: "要有 lists"});
+    opt.method = "POST"; opt.body = JSON.stringify({lists: b.lists});
+  } else if (req.method !== "GET") return json(res, 405, {error: "method"});
+  const r = await fetch(GEN_SITE + "/api/watchlist", opt);
+  const j = await r.json().catch(() => ({error: "報告生成網站回覆唔明（HTTP " + r.status + "）"}));
+  return json(res, r.ok ? 200 : r.status === 401 ? 502 : r.status, r.ok ? {lists: j.lists || []} : {error: r.status === 401 ? "報告生成網站唔接受：JLAW_ADMIN_PASSWORD 同報告中心 ADMIN_PASSWORD 唔一樣" : (j.error || "HTTP " + r.status)});
+}
+
 async function admin(req, res, p) {
   if (p === "/api/hidden" && req.method === "GET") return json(res, 200, {...visJson(), adminEnabled: !!ADMIN, canDelete: googleConnected() || !!process.env.GOOGLE_SA_JSON, canUpload: googleConnected(), googleReady: !!(G_ID && G_SECRET), googleConnected: googleConnected()});
   if (req.method !== "POST") return json(res, 405, {error: "method"});
@@ -737,6 +755,7 @@ http.createServer(async (req, res) => {
     return shotCheck(date, url.searchParams.get("fresh") === "1").then(b => json(res, 200, b)).catch(e => { console.error("shots failed", e.message); json(res, e.code || 502, {error: e.message}); });
   }
   if (p === "/api/peers" || p === "/api/peers/refresh" || p === "/api/peers/pdf") return peersApi(req, res, p, url).catch(e => { console.error("peers failed", e.message); if (!res.headersSent) json(res, 502, {error: e.message}); else res.destroy(); });
+  if (p === "/api/lists") return listsApi(req, res).catch(e => { console.error("lists failed", e.message); json(res, 502, {error: e.message}); });
   if (p === "/api/sheet" && req.method === "GET") return sheetCsv(req, res).catch(e => { console.error("sheet failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/oauth/url" || p === "/oauth/callback") return oauth(req, res, p, url).catch(e => { console.error("oauth failed", e.message); json(res, 500, {error: e.message}); });
   if (p === "/api/hidden" || p === "/api/auth" || p === "/api/hide" || p === "/api/delete") return admin(req, res, p).catch(e => { console.error("admin failed", e.message); json(res, 500, {error: e.message}); });

@@ -26,6 +26,10 @@
 - **只用 V2.0 卡計訊號／回測**（2026-10-24 用戶決定）：`sigPayload()` 嘅 `history`／`rows`／`feed`／`bt` 只由 `gen=v2` 嘅卡建；`historyAll`（全部卡）只供群友對照頁顯示「Gemini 舊卡」。舊卡係之前用 Google Gemini 出，經 `tools/stockreport/audit_cards.py` 抽查：數字約一半錯、10/20 批 66% 落後一日、「四線多頭」81% 唔屬實、分數平均高過日線客觀分 28 分。
 - 未有讀取：個股本體報告、核對附錄。
 
+## 自訂股票清單（⭐ 清單選單）
+- 用戶 2026-11-12 要求同報告生成網站（jlawreportgenerate）用同一批清單（「群組要出嘅清單」「我嘅觀察名單」等）。清單**只存喺生成網站** `DATA_DIR/watchlist.json`；呢度 `server.js` `listsApi()`：`GET／POST /api/lists`（要 `ADMIN_PASSWORD`）代讀寫生成網站 `/api/watchlist`，帶 header `x-jlaw-admin: ADMIN_PASSWORD`（生成網站嘅 `JLAW_ADMIN_PASSWORD` 係同一個值；唔一樣會回覆「唔接受」）。生成網站網址 `GEN_SITE`（默認 `https://jlawreportgenerate-production.up.railway.app`）。
+- 網頁：市場掣下面「⭐ 清單」選單（未入管理密碼就顯示「🔒 輸入管理密碼載入清單」）；揀咗清單就只顯示清單入面股票嘅報告、代號 chips、📊 買賣訊號（`sgFilter`）、📸 截圖檢查、✅ 覆蓋檢查（`wlOk()`，代號用 `tkKey` 比，00066＝66）；冇代號嘅報告（大盤）揀清單時唔顯示。可以「改內容／改名／刪除／＋新清單」（prompt，成份 POST 覆蓋，兩邊即時同步）。記住揀咗邊個（localStorage `jlaw-wl`）。
+
 ## 群友對照（👥 分頁，獨立，唔入訊號／回測）
 - **群友回測**（👥 分頁內「💰 群友回測 $100」）：`peersRefresh()` 尾段 `peersBacktest()` 只用群友報告行動卡（每股每日取最新 `mt`，唔分負責人；`claim.action` 以「未持倉：／已持倉：」切 flat／held，非 /100 分數唔用）行同一套 `buildHistory()`／`backtest()`，行情用 `peerRows`；結果存 `peers.bt`／`btPx`／`btAt`，由 `/api/peers` 回傳，前端 `btHtml(d, {links:false, extra})` 顯示。**同 V2.0 回測完全分開，唔會撈埋**（用戶 2026-10-29 要求）。
 - 資料來源：私人 Drive 資料夾「群友報告」`1jAs8B7c3nbQlUbbBisnzZw_X4aHm8lGO`（子資料夾 行動卡_群友／個股研究報告_群友／核實報告_群友），用用戶 Google OAuth token（`userToken()`）讀；簽到表（分頁「個股 research list」欄 C 代號、欄 E 負責人）決定負責人。**簽到只代表認領者，未必係實際製作者**；未簽到歸「未簽到」；全數字代號按數值正規化（66＝00066）。

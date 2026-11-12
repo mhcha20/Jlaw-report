@@ -18,6 +18,7 @@
   .wrap{max-width:900px;margin:0 auto;padding:0 16px}
   .tabs,.chips{display:flex;gap:8px;overflow-x:auto;padding:8px 0;scrollbar-width:none}
   .tabs button,.chips button{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}
+  .wlbar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:4px 0 8px}.wlbar select{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);max-width:100%}#wlTools{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}.wlbar a{font-size:13px;cursor:pointer;color:var(--brand);text-decoration:underline}.wlbar .wlinfo{font-size:13px;opacity:.75;flex-basis:100%}
   .tabs button.on,.chips button.on{background:var(--brand);border-color:var(--brand);color:#fff}
   .tools{display:flex;gap:8px;margin:4px 0 8px}
   .tools input[type=search]{flex:1;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit}
@@ -180,6 +181,7 @@
   <div id="stkList" style="display:none;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;font-size:14px;line-height:1.7"></div>
   <div class="tabs" id="tabs"></div>
   <div class="tabs" id="mkts"></div>
+  <div class="wlbar"><select id="wlSel" aria-label="自訂股票清單"><option value="">⭐ 清單：全部股票</option></select><span id="wlTools"></span></div>
   <div class="chips" id="chips"></div>
   <div class="tools">
     <input type="search" id="q" placeholder="搜尋（股票代號、日期、報告類型…）">
@@ -227,6 +229,9 @@ const MKT_OVERRIDE = {NESN:"eu", SCHN:"eu", ATD:"ca", MC:"eu"};   // 英文字�
 const mktOf = (t, name) => t ? (MKT_OVERRIDE[t] ? MKT_OVERRIDE[t] : /^(\d{5}|0\d{3})$/.test(t) ? "hk" : /^\d{6}$/.test(t) ? "kr" : /^\d{4}$/.test(t) ? "jp" : "us")
   : /港股|恒生|恆生/.test(name || "") ? "hk" : /日本|日股|日經/.test(name || "") ? "jp" : /韓國|韓股|KOSPI/i.test(name || "") ? "kr" : "us";
 const mktOk = m => state.mkt === "all" || state.mkt === m;
+// 自訂股票清單（用戶 2026-11-12：同報告生成網站同一批清單，存喺生成網站；/api/lists 經伺服器代讀寫）
+const wl = {lists: null, cur: "", set: null, err: ""};
+const wlOk = t => !wl.set || (!!t && wl.set.has(tkKey(t)));
 const state = {cat:"all", mkt:"all", ticker:"all", q:"", sel:new Set(), hidden:new Set(), deleted:new Set(), showHidden:false, pw:"", canDelete:false, canUpload:false, googleReady:false, googleConnected:false};
 try { const s = JSON.parse(localStorage.getItem("jlaw-sel")||"[]"); s.forEach(i => state.sel.add(i)); $("#phone").value = localStorage.getItem("jlaw-phone")||""; } catch(e){}
 
@@ -255,7 +260,7 @@ function visible(){
   return items.filter(r =>
     !state.deleted.has(r.id) && (state.showHidden || !state.hidden.has(r.id)) &&
     (state.cat==="all" || state.cat==="new" || r.cat===state.cat) &&
-    (state.ticker==="all" || r.ticker===state.ticker) && mktOk(mktOf(r.ticker, r.name)) &&
+    (state.ticker==="all" || r.ticker===state.ticker) && mktOk(mktOf(r.ticker, r.name)) && wlOk(r.ticker) &&
     (!q || (r.name+" "+CATS[r.cat]).toLowerCase().includes(q)));
 }
 function btns(el, entries, key){
@@ -277,7 +282,7 @@ function render(){
   $("#cov").style.display = isCov ? "" : "none"; $("#sig").style.display = isSig ? "" : "none"; $("#peer").style.display = isPeer ? "" : "none"; $("#shots").style.display = isShots ? "" : "none";
   $("#list").style.display = isSpecial ? "none" : ""; document.querySelector(".tools").style.display = isSpecial ? "none" : "";
   if(isSpecial){ $("#chips").style.display = "none"; isShots ? renderShots() : isCov ? renderCov() : isSig ? renderSig() : renderPeer(); updateBar(); return; }
-  const tickers = [...new Set(items.filter(r => !state.deleted.has(r.id) && (state.showHidden || !state.hidden.has(r.id)) && (state.cat==="all" || state.cat==="new" || r.cat===state.cat) && mktOk(mktOf(r.ticker, r.name))).map(r=>r.ticker).filter(Boolean))].sort();
+  const tickers = [...new Set(items.filter(r => !state.deleted.has(r.id) && (state.showHidden || !state.hidden.has(r.id)) && (state.cat==="all" || state.cat==="new" || r.cat===state.cat) && mktOk(mktOf(r.ticker, r.name)) && wlOk(r.ticker)).map(r=>r.ticker).filter(Boolean))].sort();
   if(state.ticker!=="all" && !tickers.includes(state.ticker)) state.ticker="all";
   btns($("#chips"), [["all","所有股票"], ...tickers.map(t=>[t,t])], "ticker");
   $("#chips").style.display = tickers.length ? "" : "none";
@@ -400,7 +405,7 @@ async function api(path, payload){
   return {ok:r.ok, status:r.status, j};
 }
 function applyVis(j){ state.hidden = new Set(j.hidden||[]); state.deleted = new Set(j.deleted||[]); [...state.sel].forEach(i => { if(state.deleted.has(i)) state.sel.delete(i); }); updTotal(); persist(); render(); }
-function lock(){ if(state.cat === "cov" || state.cat === "peer"){ state.cat = "all"; pr.data = null; }  state.pw = ""; try{ sessionStorage.removeItem("jlaw-pw"); }catch(e){} state.showHidden = false; $("#showHidCb").checked = false; adminUi(); render(); }
+function lock(){ if(state.cat === "cov" || state.cat === "peer"){ state.cat = "all"; pr.data = null; }  state.pw = ""; wl.lists = null; wl.set = null; wl.err = ""; wlDraw(); try{ sessionStorage.removeItem("jlaw-pw"); }catch(e){} state.showHidden = false; $("#showHidCb").checked = false; adminUi(); render(); }
 function adminUi(){
   const on = !!state.pw;
   $("#adm").textContent = on ? "🔓 管理中（退出）" : "🔒 管理"; $("#adm").classList.toggle("on", on);
@@ -410,6 +415,67 @@ function adminUi(){
   $("#gconn").style.display = on && state.googleReady && !state.googleConnected ? "inline-block" : "none";
 }
 $("#adm").onclick = async () => { if(state.pw) return lock(); await doUnlock(); };
+async function wlFetch(lists){   // 冇 lists＝讀；有＝成份覆蓋寫入
+  const r = await fetch("/api/lists", lists ? {method:"POST", headers:{"Content-Type":"application/json", "x-admin-password":state.pw}, body:JSON.stringify({lists})} : {headers:{"x-admin-password":state.pw}});
+  const j = await r.json().catch(() => ({}));
+  if(r.status === 401){ lock(); throw new Error("密碼錯誤，已退出管理"); }
+  if(!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+  return j.lists || [];
+}
+async function wlLoad(){
+  if(!state.pw){ wl.lists = null; wl.set = null; wlDraw(); return; }
+  try { wl.lists = await wlFetch(); wl.err = ""; } catch(e){ wl.err = e.message; wl.lists = null; }
+  if(!wl.cur){ try{ wl.cur = localStorage.getItem("jlaw-wl") || ""; }catch(e){} }
+  wlApply(); render();
+}
+function wlApply(){
+  const l = (wl.lists || []).find(x => x.name === wl.cur);
+  if(!l){ wl.cur = ""; wl.set = null; } else wl.set = new Set(l.tickers.map(tkKey));
+  try{ localStorage.setItem("jlaw-wl", wl.cur); }catch(e){}
+  wlDraw();
+}
+function wlDraw(){
+  const sel = $("#wlSel"); if(!sel) return;
+  const opts = ['<option value="">⭐ 清單：全部股票</option>'].concat(wl.lists ? wl.lists.map(l => `<option value="${esc(l.name)}" ${l.name === wl.cur ? "selected" : ""}>⭐ ${esc(l.name)}（${l.tickers.length} 隻）</option>`) : [`<option value="__unlock">🔒 輸入管理密碼載入清單</option>`]);
+  sel.innerHTML = opts.join("");
+  const l = (wl.lists || []).find(x => x.name === wl.cur);
+  $("#wlTools").innerHTML = !wl.lists ? (wl.err ? `<span class="wlinfo">⚠ ${esc(wl.err)}</span>` : "")
+    : (l ? `<a id="wlEdit">改內容</a><a id="wlRen">改名</a><a id="wlDel">刪除</a>` : "") + `<a id="wlNew">＋新清單</a>`
+      + (l ? `<span class="wlinfo">只顯示：${l.tickers.map(esc).join("、") || "（空清單）"}。同報告生成網站同一批清單，喺邊度改都會同步。</span>` : "");
+  const on = (id, f) => { const e = $("#" + id); if(e) e.onclick = f; };
+  on("wlEdit", () => wlEditTickers(l)); on("wlRen", () => wlRename(l)); on("wlDel", () => wlDelete(l)); on("wlNew", wlNew);
+}
+const wlParse = s => [...new Set(String(s || "").toUpperCase().split(/[\s,，、]+/).filter(Boolean))];
+async function wlSave(lists, msg){
+  try { wl.lists = await wlFetch(lists); wlApply(); render(); toast(msg); } catch(e){ toast("存唔到：" + e.message); }
+}
+async function wlEditTickers(l){
+  const v = prompt(`「${l.name}」入面嘅股票（空格分開；港股用 5 位，例如 00066）`, l.tickers.join(" ")); if(v === null) return;
+  const ts = wlParse(v); const bad = ts.filter(t => !/^[A-Z0-9.]{1,10}$/.test(t));
+  if(bad.length){ alert("代號唔啱：" + bad.join("、")); return; }
+  await wlSave(wl.lists.map(x => x.name === l.name ? {name:x.name, tickers:ts} : x), `「${l.name}」已更新（${ts.length} 隻）`);
+}
+async function wlRename(l){
+  const n = (prompt("改做咩名？（最多 20 字）", l.name) || "").trim(); if(!n || n === l.name) return;
+  if(wl.lists.some(x => x.name === n)){ alert("已經有同名清單"); return; }
+  wl.cur = n; await wlSave(wl.lists.map(x => x.name === l.name ? {name:n, tickers:x.tickers} : x), `已改名做「${n}」`);
+}
+async function wlDelete(l){
+  if(wl.lists.length <= 1){ alert("最少要留一個清單"); return; }
+  if(!confirm(`刪除清單「${l.name}」（${l.tickers.length} 隻）？報告生成網站嗰邊都會一齊刪，冇得復原。`)) return;
+  wl.cur = ""; await wlSave(wl.lists.filter(x => x.name !== l.name), `已刪除「${l.name}」`);
+}
+async function wlNew(){
+  const n = (prompt("新清單叫咩名？（最多 20 字）") || "").trim(); if(!n) return;
+  if(wl.lists.some(x => x.name === n)){ alert("已經有同名清單"); return; }
+  const ts = wlParse(prompt("放邊啲股票？（空格分開，可以留空之後再改）") || "");
+  wl.cur = n; await wlSave([...wl.lists, {name:n, tickers:ts}], `已新增清單「${n}」`);
+}
+$("#wlSel").onchange = async e => {
+  const v = e.target.value;
+  if(v === "__unlock"){ e.target.value = ""; await doUnlock(); return; }
+  wl.cur = v; wlApply(); render();
+};
 async function doUnlock(){
   const pw = prompt("請輸入管理密碼"); if(!pw) return;
   state.pw = pw;
@@ -417,7 +483,7 @@ async function doUnlock(){
     const r = await api("/api/auth");
     if(!r.ok) throw new Error(r.status === 503 ? "未設定 ADMIN_PASSWORD" : (r.j.error || "密碼錯誤"));
     try{ sessionStorage.setItem("jlaw-pw", pw); }catch(e){}
-    adminUi(); render(); toast("已進入管理模式");
+    adminUi(); render(); toast("已進入管理模式"); wlLoad();
   } catch(e){ state.pw = ""; adminUi(); toast(e.message); }
 }
 $("#showHidCb").onchange = e => { state.showHidden = e.target.checked; render(); };
@@ -514,7 +580,7 @@ async function loadShots(force, date){
 function shotRows(){
   const d = shots.data; if(!d) return [];
   const q = shots.q.trim().toLowerCase();
-  return d.stocks.rows.filter(r => mktOk(mktOf(r.ticker)) && (!q || r.ticker.toLowerCase().includes(q)));
+  return d.stocks.rows.filter(r => mktOk(mktOf(r.ticker)) && wlOk(r.ticker) && (!q || r.ticker.toLowerCase().includes(q)));
 }
 function shotText(rows){
   const d = shots.data, m = d.market;
@@ -612,7 +678,7 @@ function covCompute(){
   const has = {stock:new Set(), card:new Set(), verify:new Set()}, extras = new Set();
   typed.filter(r => inScope(tdate(r.date))).forEach(r => { const t = tickerOf(r); if(t) has[r.cat].add(t); else if(r.ticker && mktOk(mktOf(r.ticker, r.name))) extras.add(r.ticker); });
   const sheetMkt = x => /港股/.test(x.theme) ? "hk" : /日股/.test(x.theme) ? "jp" : /韓股/.test(x.theme) ? "kr" : /歐洲/.test(x.theme) ? "eu" : /加拿大/.test(x.theme) ? "ca" : "us";   // 表格主題欄標明市場；其餘當美股
-  const req = cov.sheet.filter(x => mktOk(sheetMkt(x)) && (cov.scope === "since" || !x.added || tdate(x.added) <= cov.day));
+  const req = cov.sheet.filter(x => mktOk(sheetMkt(x)) && wlOk(x.ticker) && (cov.scope === "since" || !x.added || tdate(x.added) <= cov.day));
   const rows = req.map(x => ({...x, s:has.stock.has(tkKey(x.ticker)), c:has.card.has(tkKey(x.ticker)), v:has.verify.has(tkKey(x.ticker))}));
   rows.forEach(x => { x.n = (x.s?1:0) + (x.c?1:0) + (x.v?1:0); });
   const mk = live.filter(r => r.cat === "market").map(r => r.date).sort().pop() || "";
@@ -669,9 +735,9 @@ async function loadSig(force){
 }
 const SIGORD = {go:0, cond:1, wait:2, none:3};
 const p2 = n => typeof n === "number" ? n.toFixed(2) : n;
-function sgFilter(d){   // 按市場篩選訊號資料
-  if(state.mkt === "all") return d;
-  const ok = t => mktOf(t) === state.mkt, pick = o => Object.fromEntries(Object.entries(o || {}).filter(([t]) => ok(t)));
+function sgFilter(d){   // 按市場（同自訂清單）篩選訊號資料
+  if(state.mkt === "all" && !wl.set) return d;
+  const ok = t => mktOk(mktOf(t)) && wlOk(t), pick = o => Object.fromEntries(Object.entries(o || {}).filter(([t]) => ok(t)));
   return {...d, rows:(d.rows || []).filter(r => ok(r.ticker)), feed:(d.feed || []).filter(e => ok(e.ticker)), history:pick(d.history), bt:pick(d.bt)};
 }
 function renderSig(){
@@ -934,7 +1000,8 @@ const link0 = id => "https://drive.google.com/file/d/" + id + "/view";
     state.canDelete = !!j.canDelete; state.canUpload = !!j.canUpload; state.googleReady = !!j.googleReady; state.googleConnected = !!j.googleConnected; applyVis(j);
     if(new URLSearchParams(location.search).get("google") === "ok"){ history.replaceState(null, "", "/"); toast("已連接 Google"); }
     const pw = sessionStorage.getItem("jlaw-pw");
-    if(pw){ state.pw = pw; const r = await api("/api/auth"); if(r.ok){ adminUi(); render(); } else lock(); }
+    if(pw){ state.pw = pw; const r = await api("/api/auth"); if(r.ok){ adminUi(); render(); wlLoad(); } else lock(); }
+    else wlDraw();
   } catch(e){ state.pw = ""; }
 })();
 </script>
