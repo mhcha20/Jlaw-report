@@ -16,7 +16,7 @@
 
 | 網站 | 用途 | Repo（公開？） | 部署 branch | 網址 | Railway project | 資料儲存 |
 |---|---|---|---|---|---|---|
-| JLaw 報告中心 | 列 Drive 股票報告、WhatsApp 分享、截圖檢查、買賣訊號、回測、群友對照 | `mhcha20/Jlaw-report`（公開） | `claude/drive-reports-whatsapp-share-6m44wo`（AI session 唔准直接 push，要開 PR） | jlaw-report-a74806.up.railway.app | `jlaw-report` | Volume `/data` |
+| JLaw 報告中心 | 列 Drive 股票報告、WhatsApp 分享、截圖檢查、買賣訊號、回測、群友對照、⭐ 自訂股票清單篩選（同報告生成器共用） | `mhcha20/Jlaw-report`（公開） | `claude/drive-reports-whatsapp-share-6m44wo`（AI session 唔准直接 push，要開 PR） | jlaw-report-a74806.up.railway.app | `jlaw-report` | Volume `/data` |
 | JLaw 報告生成器 | 撳掣用 Claude／Grok 出大盤報告同個股三份報告 | `mhcha20/jlawreportgenerate`（公開） | `main` | jlawreportgenerate-production.up.railway.app | `loving-renewal` | Volume `/data` |
 | 截圖自動化 | 每日 TradingView 大盤圖＋富途牛牛個股截圖，上載 Google Drive（俾上面兩個網站用） | `mhcha20/screencapture`（私人） | 唔喺 Railway；行喺雲端電腦（systemd timer），見該 repo | — | — | Google Drive |
 | 2027 鄉郊選舉指引問答 | 選管會指引搜尋＋Claude 回答、提名表格遮蓋工具、重要日子 | `mhcha20/2027ruralelection`（公開） | `main` | web-production-81c64.up.railway.app（全站 Basic auth） | `2027ruralelection` | Volume `/data`（遮蓋範本） |
