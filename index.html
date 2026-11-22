@@ -99,6 +99,8 @@
   #sig .st2 td.tk{position:sticky;left:0;background:var(--card);font-weight:700}
   #sig .st2 td.n{text-align:right;font-variant-numeric:tabular-nums}
   #sig .st2 tr.old td{color:var(--mute)} #sig .st2 tr.old td.tk{font-weight:600}
+  #sig .st2 tr.peer td{background:#f5f3ff} #sig .st2 tr.peer td.tk{background:#ede9fe} #sig .pt2{display:inline-block;font-size:11px;font-weight:600;padding:1px 6px;border-radius:999px;background:#7c3aed;color:#fff;margin-left:4px;vertical-align:middle}
+  #sig .ptog{display:block;font-size:13px;margin:6px 0;line-height:1.6} #sig .ptog input{vertical-align:middle;margin-right:4px} #sig .st2 .pown{font-size:11px;font-weight:400;color:var(--mute)}
   #sig .st2 .hx{color:#b91c1c;font-weight:600} #sig .st2 .ht{color:#b45309;font-weight:600}
   :is(#sig,#peer .sigbt) .pos{color:#16a34a} :is(#sig,#peer .sigbt) .neg{color:#dc2626}
   :is(#sig,#peer .sigbt) .btr{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;cursor:pointer}
@@ -728,7 +730,7 @@ function renderCov(){
 }
 
 // ---- 買賣訊號（由行動卡自動整理）----
-const sg = {tSort:"score", tDir:-1, view:"list", btSort:"ret", btOpen:new Set(), data:null, err:"", loading:false, filter:"all", timer:null, open:new Set(), feedAll:false};
+const sg = {withPeers:false, tSort:"score", tDir:-1, view:"list", btSort:"ret", btOpen:new Set(), data:null, err:"", loading:false, filter:"all", timer:null, open:new Set(), feedAll:false};
 async function loadSig(force){
   if(sg.loading) return; sg.loading = true; sg.err = ""; if(!sg.data) renderSig();
   try {
@@ -748,7 +750,35 @@ function sgFilter(d){   // 按市場（同自訂清單）篩選訊號資料
   const ok = t => mktOk(mktOf(t)) && wlOk(t), pick = o => Object.fromEntries(Object.entries(o || {}).filter(([t]) => ok(t)));
   return {...d, rows:(d.rows || []).filter(r => ok(r.ticker)), feed:(d.feed || []).filter(e => ok(e.ticker)), history:pick(d.history), bt:pick(d.bt)};
 }
+// 群友行動卡 → 總表一行（用戶 2026-11-22：總表可以用群友報告，但要標記）。歸類規則同 signals.js classify()（冇三道閘）
+function peerFlatHeld(action){
+  const a = action || "", iu = a.search(/未持倉\s*[：:]/), ih = a.search(/已持倉\s*[：:]/);
+  const flat = iu >= 0 ? a.slice(iu, ih > iu ? ih : undefined).replace(/^未持倉\s*[：:]\s*/, "") : ih < 0 ? a : "";
+  const held = ih >= 0 ? a.slice(ih).replace(/^已持倉\s*[：:]\s*/, "") : "";
+  const f = /唔做|空集|唔開新倉|零新倉|不開新倉|不建倉|唔建倉|不新增|唔買|不買|空倉觀望|零倉|保持觀望|嚴禁盲目|不入場|唔入場/.test(flat) ? {key:"none", label:"零新倉"}
+    : /低吸|吸納|分批|建倉|買入|入場|開倉|加碼/.test(flat) ? {key:"cond", label:"條件式建倉"} : {key:"wait", label:flat ? "觀望" : "–"};
+  const h = /全數離場|清倉|全部止損|立即離場|今日離場/.test(held) ? {key:"exit", label:"離場"} : /減磅|減倉|減半|減持/.test(held) ? {key:"trim", label:"減倉"}
+    : /續抱|持有|守穩|堅守|嚴守|享受主升|^持\s*[\/／]|持倉/.test(held) ? {key:"hold", label:"續抱"} : {key:"alert", label:held ? "按警報" : "–"};
+  return {flat:f, held:h};
+}
+function peerRows(){
+  if(!pr.data || !pr.data.files) return [];
+  const best = {};
+  pr.data.files.filter(f => f.kind === "card" && f.parsed && !f.image && f.date).forEach(f => {
+    const k = tkKey(f.ticker), b = best[k];
+    if(!b || f.date > b.date || (f.date === b.date && (f.mt || "") > (b.mt || ""))) best[k] = f;
+  });
+  return Object.values(best).filter(f => mktOk(mktOf(f.ticker)) && wlOk(f.ticker)).map(f => { const c = f.parsed;
+    return {ticker:f.ticker, date:f.date, stars:c.stars, rating:c.rating, score:c.scoreScale === "/100" ? c.score : undefined, close:c.close,
+      cls:peerFlatHeld(c.action), peer:true, pid:f.id, owner:f.signed ? f.owner : "未簽到"}; });
+}
 function sigTable(rows){
+  let nPeer = 0;
+  if(sg.withPeers && state.pw && pr.data){   // 每隻股票用最新嗰張：群友卡日期新過 V2.0 卡（或者冇 V2.0 卡）先用群友卡
+    const byK = {}; rows.forEach(r => byK[tkKey(r.ticker)] = r);
+    peerRows().forEach(p => { const k = tkKey(p.ticker), v = byK[k]; if(!v || p.date > v.date){ byK[k] = Object.assign(p, v ? {v2date:v.date} : {}); nPeer++; } });
+    rows = Object.values(byK);
+  }
   const maxDate = rows.reduce((m, r) => r.date > m ? r.date : m, "");
   const lv = (r, k) => r.levels && r.levels[k] && typeof r.levels[k].pct === "number" ? r.levels[k].pct * (k === "buy" && r.levels[k].dir !== "up" ? -1 : 1) : null;
   const val = {
@@ -769,18 +799,20 @@ function sigTable(rows){
     if(k === "stop" && p.pct < 0) return p2(p.price) + ' <span class="no">已跌穿</span>';
     return p2(p.price) + ' <span class="mut">' + (k === "buy" ? (p.dir === "up" ? "▲" : "▼") : "▼") + p2(Math.abs(p.pct)) + '%</span>'; };
   const old = rows.filter(r => r.date < maxDate).length;
-  return '<p class="note">每隻股票最新一張 V2.0 行動卡（' + rows.length + ' 隻；最新 ' + (maxDate || "–") + '，灰色＝較舊嘅卡 ' + old + ' 隻）。撳表頭排序，再撳反轉；手機可以左右碌。距離 ÷ 收市價：觸發 ▲＝要升幾多先到、止損 ▼＝跌幾多會穿。</p>' +
+  const tog = state.pw ? '<label class="ptog"><input type="checkbox" id="sgPeers"' + (sg.withPeers ? " checked" : "") + '> 加入群友報告（<span class="pt2">👥 群友</span> 標記；只係邊隻股票嘅群友卡新過 V2.0 卡、或者冇 V2.0 卡先用）' + (sg.withPeers && !pr.data ? ' <span class="mut">讀取中…</span>' : sg.withPeers ? ' <span class="mut">用咗 ' + nPeer + ' 張</span>' : '') + '</label>'
+    : '<p class="note">輸入管理密碼之後可以加入群友報告。</p>';
+  return tog + '<p class="note">每隻股票最新一張' + (sg.withPeers && state.pw ? '行動卡（V2.0 或群友）' : ' V2.0 行動卡') + '（' + rows.length + ' 隻；最新 ' + (maxDate || "–") + '，灰色＝較舊嘅卡 ' + old + ' 隻）。撳表頭排序，再撳反轉；手機可以左右碌。距離 ÷ 收市價：觸發 ▲＝要升幾多先到、止損 ▼＝跌幾多會穿。</p>' +
     '<div class="tw"><table class="st2"><tr>' + th("ticker", "代號") + th("date", "卡日期") + '<th>評等</th>' + th("score", "分數") + th("chg", "變化") +
     th("flat", "未持倉") + th("held", "已持倉") + th("close", "收市") + th("buy", "觸發") + th("stop", "止損") + '</tr>' +
     list.map(r => { const c = r.cls;
-      return '<tr class="' + (r.date < maxDate ? "old" : "") + '"><td class="tk"><a href="' + link0(r.id) + '" target="_blank" rel="noopener">' + esc(r.ticker) + '</a></td>' +
+      return '<tr class="' + (r.date < maxDate ? "old" : "") + (r.peer ? " peer" : "") + '"><td class="tk">' + (r.peer ? '<a href="#" data-ppdf="' + esc(r.pid) + '">' + esc(r.ticker) + '</a><span class="pt2">👥 群友</span><div class="pown">' + esc(r.owner) + (r.v2date ? '；V2.0 卡 ' + esc(r.v2date.slice(5)) : '；冇 V2.0 卡') + '</div>' : '<a href="' + link0(r.id) + '" target="_blank" rel="noopener">' + esc(r.ticker) + '</a>') + '</td>' +
         '<td>' + esc(r.date.slice(5)) + '</td><td>' + (r.stars ? "★".repeat(r.stars) + " " : "") + esc(r.rating || "") + '</td>' +
         '<td class="n">' + (typeof r.score === "number" ? r.score : "") + '</td><td class="n">' + chg(r) + '</td>' +
         '<td><span class="chip ' + c.flat.key + '">' + esc(c.flat.label) + '</span></td>' +
         '<td class="' + (c.held.key === "exit" ? "hx" : c.held.key === "trim" ? "ht" : "") + '">' + esc(c.held.label) + '</td>' +
         '<td class="n">' + (typeof r.close === "number" ? p2(r.close) : "") + '</td><td class="n">' + pct(r, "buy") + '</td><td class="n">' + pct(r, "stop") + '</td></tr>';
     }).join("") + '</table></div>' +
-    '<div class="ft">只係行動卡內容嘅整理，唔係買賣建議；以當日行動卡原文為準。代號連去嗰張行動卡。</div>';
+    '<div class="ft">只係行動卡內容嘅整理，唔係買賣建議；以當日行動卡原文為準。代號連去嗰張行動卡。' + (sg.withPeers && state.pw ? '<br>👥 群友卡係群組成員自己做，唔係 V2.0 生成器卡：冇觸發／止損價、分數只計 /100 制、動作按卡內文字粗略歸類；唔會入訊號同回測。代號下面細字＝負責人同嗰隻嘅 V2.0 卡日期。' : '') + '</div>';
 }
 function renderSig(){
   const el = $("#sig"); if(state.cat !== "sig") return;
@@ -788,7 +820,9 @@ function renderSig(){
   if(!sg.data){ el.innerHTML = '<p class="note">讀取中…</p>'; return; }
   const d = sgFilter(sg.data), rows = d.rows.filter(r => r.cls);
   const vt = '<div class="vt"><button data-v="list" class="' + (sg.view === "list" ? "on" : "") + '">📋 訊號</button><button data-v="table" class="' + (sg.view === "table" ? "on" : "") + '">📊 總表</button><button data-v="bt" class="' + (sg.view === "bt" ? "on" : "") + '">💰 回測 $100</button></div>';
-  if(sg.view === "table"){ el.innerHTML = vt + sigTable(rows);   // 用戶 2026-11-22：一個表睇晒所有股票最新評級
+  if(sg.view === "table"){ el.innerHTML = vt + sigTable(rows);
+    const pt = $("#sgPeers"); if(pt) pt.onchange = () => { sg.withPeers = pt.checked; if(sg.withPeers && !pr.data) loadPeers(false).then(renderSig); renderSig(); };
+    el.querySelectorAll("[data-ppdf]").forEach(a => a.onclick = async e => { e.preventDefault(); await openPeerPdf(a.dataset.ppdf); });   // 用戶 2026-11-22：一個表睇晒所有股票最新評級
     el.querySelectorAll("[data-v]").forEach(b => b.onclick = () => { sg.view = b.dataset.v; renderSig(); });
     el.querySelectorAll("[data-ts]").forEach(b => b.onclick = () => { const k = b.dataset.ts; if(sg.tSort === k) sg.tDir = -sg.tDir; else { sg.tSort = k; sg.tDir = (k === "ticker" || k === "buy" || k === "stop") ? 1 : -1; } renderSig(); });
     return; }
@@ -927,7 +961,7 @@ async function loadPeers(force){
     pr.data = j;
     if(!pr.ours) fetch("/api/signals").then(x => x.json()).then(j2 => { pr.ours = j2.historyAll || j2.history || {}; renderPeer(); }).catch(() => { pr.ours = {}; });
   } catch(e){ pr.err = e.message; }
-  pr.loading = false; renderPeer();
+  pr.loading = false; renderPeer(); if(state.cat === "sig") renderSig();   // 總表加咗群友報告
   clearTimeout(pr.timer);
   if(state.cat === "peer" && pr.data && pr.data.state && pr.data.state.running) pr.timer = setTimeout(() => loadPeers(false), 3000);
 }
