@@ -92,6 +92,14 @@
   :is(#sig,#peer .sigbt) button.lnk{border:0;background:none;color:var(--brand);padding:2px 0;font:inherit;font-size:13px;cursor:pointer}
   :is(#sig,#peer .sigbt) .vt{display:flex;gap:8px;margin:8px 0} :is(#sig,#peer .sigbt) .vt button{flex:1;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px;font:inherit;font-weight:600;cursor:pointer}
   :is(#sig,#peer .sigbt) .vt button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  #sig .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:10px;margin:8px 0}
+  #sig table.st2{border-collapse:collapse;font-size:13px;min-width:720px;width:100%}
+  #sig .st2 th,#sig .st2 td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+  #sig .st2 th{position:sticky;top:0;background:var(--card);cursor:pointer;font-weight:600;user-select:none}
+  #sig .st2 td.tk{position:sticky;left:0;background:var(--card);font-weight:700}
+  #sig .st2 td.n{text-align:right;font-variant-numeric:tabular-nums}
+  #sig .st2 tr.old td{color:var(--mute)} #sig .st2 tr.old td.tk{font-weight:600}
+  #sig .st2 .hx{color:#b91c1c;font-weight:600} #sig .st2 .ht{color:#b45309;font-weight:600}
   :is(#sig,#peer .sigbt) .pos{color:#16a34a} :is(#sig,#peer .sigbt) .neg{color:#dc2626}
   :is(#sig,#peer .sigbt) .btr{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;cursor:pointer}
   :is(#sig,#peer .sigbt) .btr .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -720,7 +728,7 @@ function renderCov(){
 }
 
 // ---- 買賣訊號（由行動卡自動整理）----
-const sg = {view:"list", btSort:"ret", btOpen:new Set(), data:null, err:"", loading:false, filter:"all", timer:null, open:new Set(), feedAll:false};
+const sg = {tSort:"score", tDir:-1, view:"list", btSort:"ret", btOpen:new Set(), data:null, err:"", loading:false, filter:"all", timer:null, open:new Set(), feedAll:false};
 async function loadSig(force){
   if(sg.loading) return; sg.loading = true; sg.err = ""; if(!sg.data) renderSig();
   try {
@@ -740,12 +748,50 @@ function sgFilter(d){   // 按市場（同自訂清單）篩選訊號資料
   const ok = t => mktOk(mktOf(t)) && wlOk(t), pick = o => Object.fromEntries(Object.entries(o || {}).filter(([t]) => ok(t)));
   return {...d, rows:(d.rows || []).filter(r => ok(r.ticker)), feed:(d.feed || []).filter(e => ok(e.ticker)), history:pick(d.history), bt:pick(d.bt)};
 }
+function sigTable(rows){
+  const maxDate = rows.reduce((m, r) => r.date > m ? r.date : m, "");
+  const lv = (r, k) => r.levels && r.levels[k] && typeof r.levels[k].pct === "number" ? r.levels[k].pct * (k === "buy" && r.levels[k].dir !== "up" ? -1 : 1) : null;
+  const val = {
+    ticker: r => r.ticker, date: r => r.date, score: r => typeof r.score === "number" ? r.score : -1,
+    chg: r => typeof r.score === "number" && typeof r.prevScore === "number" ? r.score - r.prevScore : null,
+    flat: r => SIGORD[r.cls.flat.key] ?? 9, held: r => ({exit:0, trim:1, hold:2})[r.cls.held.key] ?? 3,
+    close: r => typeof r.close === "number" ? r.close : null, buy: r => lv(r, "buy"), stop: r => lv(r, "stop")};
+  const f = val[sg.tSort] || val.score, dir = sg.tDir;
+  const list = rows.slice().sort((a, b) => {
+    const x = f(a), y = f(b);
+    if(x === null && y === null) return a.ticker.localeCompare(b.ticker);
+    if(x === null) return 1; if(y === null) return -1;
+    return (typeof x === "string" ? x.localeCompare(y) : x - y) * dir || a.ticker.localeCompare(b.ticker);
+  });
+  const th = (k, lab) => '<th data-ts="' + k + '">' + lab + (sg.tSort === k ? (dir > 0 ? " ▲" : " ▼") : "") + '</th>';
+  const chg = r => { const c = val.chg(r); return c === null ? "" : c > 0 ? '<span class="ok">▲' + c + '</span>' : c < 0 ? '<span class="no">▼' + (-c) + '</span>' : '<span class="mut">–</span>'; };
+  const pct = (r, k) => { const v = lv(r, k); if(v === null) return ""; const p = r.levels[k];
+    if(k === "stop" && p.pct < 0) return p2(p.price) + ' <span class="no">已跌穿</span>';
+    return p2(p.price) + ' <span class="mut">' + (k === "buy" ? (p.dir === "up" ? "▲" : "▼") : "▼") + p2(Math.abs(p.pct)) + '%</span>'; };
+  const old = rows.filter(r => r.date < maxDate).length;
+  return '<p class="note">每隻股票最新一張 V2.0 行動卡（' + rows.length + ' 隻；最新 ' + (maxDate || "–") + '，灰色＝較舊嘅卡 ' + old + ' 隻）。撳表頭排序，再撳反轉；手機可以左右碌。距離 ÷ 收市價：觸發 ▲＝要升幾多先到、止損 ▼＝跌幾多會穿。</p>' +
+    '<div class="tw"><table class="st2"><tr>' + th("ticker", "代號") + th("date", "卡日期") + '<th>評等</th>' + th("score", "分數") + th("chg", "變化") +
+    th("flat", "未持倉") + th("held", "已持倉") + th("close", "收市") + th("buy", "觸發") + th("stop", "止損") + '</tr>' +
+    list.map(r => { const c = r.cls;
+      return '<tr class="' + (r.date < maxDate ? "old" : "") + '"><td class="tk"><a href="' + link0(r.id) + '" target="_blank" rel="noopener">' + esc(r.ticker) + '</a></td>' +
+        '<td>' + esc(r.date.slice(5)) + '</td><td>' + (r.stars ? "★".repeat(r.stars) + " " : "") + esc(r.rating || "") + '</td>' +
+        '<td class="n">' + (typeof r.score === "number" ? r.score : "") + '</td><td class="n">' + chg(r) + '</td>' +
+        '<td><span class="chip ' + c.flat.key + '">' + esc(c.flat.label) + '</span></td>' +
+        '<td class="' + (c.held.key === "exit" ? "hx" : c.held.key === "trim" ? "ht" : "") + '">' + esc(c.held.label) + '</td>' +
+        '<td class="n">' + (typeof r.close === "number" ? p2(r.close) : "") + '</td><td class="n">' + pct(r, "buy") + '</td><td class="n">' + pct(r, "stop") + '</td></tr>';
+    }).join("") + '</table></div>' +
+    '<div class="ft">只係行動卡內容嘅整理，唔係買賣建議；以當日行動卡原文為準。代號連去嗰張行動卡。</div>';
+}
 function renderSig(){
   const el = $("#sig"); if(state.cat !== "sig") return;
   if(sg.err){ el.innerHTML = '<p class="note">⚠ ' + esc(sg.err) + '</p><button class="sm" id="sgRetry">重試</button>'; $("#sgRetry").onclick = () => loadSig(true); return; }
   if(!sg.data){ el.innerHTML = '<p class="note">讀取中…</p>'; return; }
   const d = sgFilter(sg.data), rows = d.rows.filter(r => r.cls);
-  const vt = '<div class="vt"><button data-v="list" class="' + (sg.view === "list" ? "on" : "") + '">📋 訊號</button><button data-v="bt" class="' + (sg.view === "bt" ? "on" : "") + '">💰 回測 $100</button></div>';
+  const vt = '<div class="vt"><button data-v="list" class="' + (sg.view === "list" ? "on" : "") + '">📋 訊號</button><button data-v="table" class="' + (sg.view === "table" ? "on" : "") + '">📊 總表</button><button data-v="bt" class="' + (sg.view === "bt" ? "on" : "") + '">💰 回測 $100</button></div>';
+  if(sg.view === "table"){ el.innerHTML = vt + sigTable(rows);   // 用戶 2026-11-22：一個表睇晒所有股票最新評級
+    el.querySelectorAll("[data-v]").forEach(b => b.onclick = () => { sg.view = b.dataset.v; renderSig(); });
+    el.querySelectorAll("[data-ts]").forEach(b => b.onclick = () => { const k = b.dataset.ts; if(sg.tSort === k) sg.tDir = -sg.tDir; else { sg.tSort = k; sg.tDir = (k === "ticker" || k === "buy" || k === "stop") ? 1 : -1; } renderSig(); });
+    return; }
   if(sg.view === "bt"){ el.innerHTML = vt + btHtml(d);
     el.querySelectorAll("[data-v]").forEach(b => b.onclick = () => { sg.view = b.dataset.v; renderSig(); });
     el.querySelectorAll("[data-bs]").forEach(b => b.onclick = () => { sg.btSort = b.dataset.bs; renderSig(); });
